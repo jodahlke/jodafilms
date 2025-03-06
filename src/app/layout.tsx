@@ -8,6 +8,9 @@ export const metadata: Metadata = {
   keywords: "Jonas Dahlke, filmmaker, cinematographer, director, portfolio, videography, film, cinema",
 };
 
+// Add cache control headers
+export const revalidate = 3600; // Revalidate content every hour
+
 export default function RootLayout({
   children,
 }: Readonly<{

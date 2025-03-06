@@ -110,7 +110,7 @@ const PortfolioSection = () => {
   const [interactedItems, setInteractedItems] = useState<{[key: number]: boolean}>({});
 
   useEffect(() => {
-    Modal.setAppElement("body");
+    // Removed redundant Modal.setAppElement call
   }, []);
 
   const openModal = (item: typeof portfolioItems[0]) => {
@@ -175,12 +175,18 @@ const PortfolioSection = () => {
 
             const handleMouseEnter = useCallback(() => {
               if (videoRef.current) {
-                videoRef.current.play().catch(error => {
-                  console.error("Video play failed:", error);
-                });
-                handleItemInteraction(item.id);
+                // Only start playing videos when they're visible and after a short delay
+                const playVideo = () => {
+                  videoRef.current?.play().catch(error => {
+                    console.error("Video play failed:", error);
+                  });
+                  handleItemInteraction(item.id);
+                };
+                
+                // Add a small delay to prevent too many videos loading at once
+                setTimeout(playVideo, 100 * (index % 4));
               }
-            }, [item.id]);
+            }, [item.id, index]);
 
             const handleMouseLeave = useCallback(() => {
               if (videoRef.current) {
@@ -207,8 +213,10 @@ const PortfolioSection = () => {
                     alt={item.title}
                     fill
                     className="object-cover portfolio-thumbnail"
-                    sizes="(max-width: 768px) 100vw, 50vw"
-                    priority={index < 4}
+                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                    priority={index < 2}
+                    loading={index < 4 ? "eager" : "lazy"}
+                    quality={80}
                   />
                 </div>
 
@@ -219,9 +227,11 @@ const PortfolioSection = () => {
                     className="w-full h-full object-cover"
                     muted
                     playsInline
-                    preload="auto"
+                    preload="none"
                   >
-                    <source src={item.videoSrc} type="video/webm" />
+                    {hasInteracted && (
+                      <source src={item.videoSrc} type="video/webm" />
+                    )}
                   </video>
                 </div>
                 
@@ -249,19 +259,22 @@ const PortfolioSection = () => {
         onRequestClose={closeModal}
         className="modal-content w-[95vw] max-w-[2000px] p-0 outline-none mx-auto"
         overlayClassName="modal-overlay"
-        contentLabel="Project Details"
+        contentLabel={`Project details for ${selectedItem?.title || 'Selected project'}`}
+        shouldReturnFocusAfterClose={true}
+        closeTimeoutMS={300}
       >
         {selectedItem && (
-          <div className="overflow-hidden">
+          <div className="p-0 md:p-4 lg:p-8 relative">
+            <button
+              onClick={closeModal}
+              className="absolute top-4 right-4 z-10 bg-black/50 rounded-full p-2 text-white hover:bg-black/80 transition-colors"
+              aria-label="Close modal"
+            >
+              <FiX className="w-6 h-6" />
+            </button>
+            
             {/* Video Section */}
             <div className="relative aspect-video w-full bg-[var(--secondary)]">
-              <button
-                onClick={closeModal}
-                className="absolute top-6 right-6 z-10 bg-[var(--secondary)]/80 text-white p-3 hover:bg-[var(--primary)] transition-colors"
-              >
-                <FiX size={28} />
-              </button>
-              
               <video
                 className="w-full h-full object-cover"
                 controls

@@ -7,24 +7,52 @@ import Link from "next/link";
 const HeroSection = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoLoaded, setVideoLoaded] = useState(false);
+  const [videoError, setVideoError] = useState(false);
+  const [videoSrc, setVideoSrc] = useState<string>("/assets/videos/hero/hero-video.webm");
 
   useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.play().catch(error => {
-        console.error("Video play failed:", error);
-      });
+    // Set the absolute URL for the video once we're on the client
+    if (typeof window !== 'undefined') {
+      setVideoSrc(`${window.location.origin}/assets/videos/hero/hero-video.webm`);
     }
 
-    const handleVideoLoaded = () => {
+    // Manual video loading and error handling 
+    const handleVideoLoad = () => {
       setVideoLoaded(true);
+      console.log("Video loaded successfully");
+    };
+
+    const handleVideoError = (e: any) => {
+      console.error("Video error:", e);
+      setVideoError(true);
     };
 
     const videoElement = videoRef.current;
     if (videoElement) {
-      videoElement.addEventListener('loadeddata', handleVideoLoaded);
+      // Add event listeners for loading and error states
+      videoElement.addEventListener('loadeddata', handleVideoLoad);
+      videoElement.addEventListener('error', handleVideoError);
+      
+      // Try to manually load and play the video
+      try {
+        videoElement.load();
+        // Small delay to avoid immediate play issues
+        setTimeout(() => {
+          videoElement.play()
+            .then(() => console.log("Video playing"))
+            .catch(err => {
+              console.error("Video play failed:", err);
+              setVideoError(true);
+            });
+        }, 300);
+      } catch (err) {
+        console.error("Video load error:", err);
+        setVideoError(true);
+      }
       
       return () => {
-        videoElement.removeEventListener('loadeddata', handleVideoLoaded);
+        videoElement.removeEventListener('loadeddata', handleVideoLoad);
+        videoElement.removeEventListener('error', handleVideoError);
       };
     }
   }, []);
@@ -33,21 +61,31 @@ const HeroSection = () => {
     <section id="home" className="relative h-screen w-full overflow-hidden">
       {/* Video Background */}
       <div className="absolute inset-0 z-0 bg-black/60">
-        {!videoLoaded && (
+        {!videoLoaded && !videoError && (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="w-12 h-12 border-4 border-[var(--primary)] border-t-transparent rounded-full animate-spin"></div>
           </div>
         )}
+        
+        {/* Fallback image if video fails to load */}
+        {videoError && (
+          <div 
+            className="absolute inset-0 bg-cover bg-center opacity-70"
+            style={{ backgroundImage: "url('/assets/photos/portfolio/R1-05309-0020.jpg')" }}
+          />
+        )}
+        
         <video
           ref={videoRef}
-          className={`object-cover w-full h-full transition-opacity duration-1000 ${videoLoaded ? 'opacity-70' : 'opacity-0'}`}
+          className={`object-cover w-full h-full transition-opacity duration-1000 ${videoLoaded && !videoError ? 'opacity-70' : 'opacity-0'}`}
           autoPlay
           muted
           loop
           playsInline
           preload="auto"
-          poster="/assets/videos/hero/poster.jpg"
+          poster="/assets/photos/portfolio/R1-05309-0020.jpg"
         >
+          {/* Use both regular path and dynamically set path (on client) */}
           <source src="/assets/videos/hero/hero-video.webm" type="video/webm" />
           Your browser does not support the video tag.
         </video>

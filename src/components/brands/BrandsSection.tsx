@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Autoplay } from "swiper/modules";
@@ -73,6 +74,13 @@ const brands = [
 ];
 
 const BrandsSection = () => {
+  const [isClient, setIsClient] = useState(false);
+  
+  // Use useEffect to ensure this only runs on the client
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
   return (
     <section id="brands" className="section-padding bg-[var(--secondary)]">
       <div className="container-custom">
@@ -99,46 +107,53 @@ const BrandsSection = () => {
           transition={{ duration: 0.6, delay: 0.2 }}
           className="mb-16 content-overlay p-6"
         >
-          <Swiper
-            modules={[Autoplay]}
-            spaceBetween={50}
-            slidesPerView={2}
-            loop={true}
-            speed={3000}
-            autoplay={{
-              delay: 0,
-              disableOnInteraction: false,
-              reverseDirection: false,
-            }}
-            breakpoints={{
-              640: {
-                slidesPerView: 3,
-              },
-              768: {
-                slidesPerView: 4,
-              },
-              1024: {
-                slidesPerView: 5,
-              },
-            }}
-            className="brands-slider"
-          >
-            {brands.slice(0, 6).map((brand) => (
-              <SwiperSlide key={brand.id} className="py-4">
-                <div className="flex items-center justify-center h-24 px-4 grayscale opacity-70 hover:grayscale-0 hover:opacity-100 transition-all duration-300">
-                  <div className="h-16 w-full flex items-center justify-center bg-white rounded-md shadow-sm p-2">
-                    <Image
-                      src={brand.logo}
-                      alt={brand.name}
-                      width={120}
-                      height={60}
-                      className="object-contain max-h-full"
-                    />
+          {isClient && (
+            <Swiper
+              modules={[Autoplay]}
+              spaceBetween={30}
+              slidesPerView={2}
+              loop={true}
+              speed={5000}
+              autoplay={{
+                delay: 0,
+                disableOnInteraction: false,
+                reverseDirection: false,
+              }}
+              breakpoints={{
+                640: {
+                  slidesPerView: 3,
+                  spaceBetween: 40,
+                },
+                768: {
+                  slidesPerView: 4,
+                  spaceBetween: 40,
+                },
+                1024: {
+                  slidesPerView: 5,
+                  spaceBetween: 50,
+                },
+              }}
+              className="brands-slider"
+            >
+              {brands.slice(0, 6).map((brand) => (
+                <SwiperSlide key={brand.id} className="py-4">
+                  <div className="flex items-center justify-center h-24 px-4 grayscale opacity-70 hover:grayscale-0 hover:opacity-100 transition-all duration-300">
+                    <div className="h-16 w-full flex items-center justify-center bg-white rounded-md shadow-sm p-2">
+                      <Image
+                        src={brand.logo}
+                        alt={brand.name}
+                        width={120}
+                        height={60}
+                        className="object-contain max-h-full"
+                        sizes="120px"
+                        loading="lazy"
+                      />
+                    </div>
                   </div>
-                </div>
-              </SwiperSlide>
-            ))}
-          </Swiper>
+                </SwiperSlide>
+              ))}
+            </Swiper>
+          )}
         </motion.div>
 
         {/* Second row of brands - moving in opposite direction */}
@@ -149,46 +164,53 @@ const BrandsSection = () => {
           transition={{ duration: 0.6, delay: 0.4 }}
           className="content-overlay p-6"
         >
-          <Swiper
-            modules={[Autoplay]}
-            spaceBetween={50}
-            slidesPerView={2}
-            loop={true}
-            speed={3000}
-            autoplay={{
-              delay: 0,
-              disableOnInteraction: false,
-              reverseDirection: true,
-            }}
-            breakpoints={{
-              640: {
-                slidesPerView: 3,
-              },
-              768: {
-                slidesPerView: 4,
-              },
-              1024: {
-                slidesPerView: 5,
-              },
-            }}
-            className="brands-slider"
-          >
-            {brands.slice(6, 12).map((brand) => (
-              <SwiperSlide key={brand.id} className="py-4">
-                <div className="flex items-center justify-center h-24 px-4 grayscale opacity-70 hover:grayscale-0 hover:opacity-100 transition-all duration-300">
-                  <div className="h-16 w-full flex items-center justify-center bg-white rounded-md shadow-sm p-2">
-                    <Image
-                      src={brand.logo}
-                      alt={brand.name}
-                      width={120}
-                      height={60}
-                      className="object-contain max-h-full"
-                    />
+          {isClient && (
+            <Swiper
+              modules={[Autoplay]}
+              spaceBetween={30}
+              slidesPerView={2}
+              loop={true}
+              speed={5000}
+              autoplay={{
+                delay: 0,
+                disableOnInteraction: false,
+                reverseDirection: true,
+              }}
+              breakpoints={{
+                640: {
+                  slidesPerView: 3,
+                  spaceBetween: 40,
+                },
+                768: {
+                  slidesPerView: 4,
+                  spaceBetween: 40,
+                },
+                1024: {
+                  slidesPerView: 5,
+                  spaceBetween: 50,
+                },
+              }}
+              className="brands-slider"
+            >
+              {brands.slice(6, 12).map((brand) => (
+                <SwiperSlide key={brand.id} className="py-4">
+                  <div className="flex items-center justify-center h-24 px-4 grayscale opacity-70 hover:grayscale-0 hover:opacity-100 transition-all duration-300">
+                    <div className="h-16 w-full flex items-center justify-center bg-white rounded-md shadow-sm p-2">
+                      <Image
+                        src={brand.logo}
+                        alt={brand.name}
+                        width={120}
+                        height={60}
+                        className="object-contain max-h-full"
+                        sizes="120px"
+                        loading="lazy"
+                      />
+                    </div>
                   </div>
-                </div>
-              </SwiperSlide>
-            ))}
-          </Swiper>
+                </SwiperSlide>
+              ))}
+            </Swiper>
+          )}
         </motion.div>
       </div>
     </section>

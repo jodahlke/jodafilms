@@ -9,6 +9,11 @@ const Navbar = () => {
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
+    // Set initial scroll state
+    if (typeof window !== 'undefined') {
+      setScrolled(window.scrollY > 50);
+    }
+
     const handleScroll = () => {
       if (window.scrollY > 50) {
         setScrolled(true);
@@ -24,7 +29,7 @@ const Navbar = () => {
   return (
     <header 
       className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 ${
-        scrolled ? "bg-[var(--secondary)]/90 backdrop-blur-md py-4" : "bg-transparent py-6"
+        scrolled ? "navbar-scrolled py-4" : "navbar-transparent py-6"
       }`}
     >
       <div className="container-custom flex items-center justify-between">
@@ -52,6 +57,9 @@ const Navbar = () => {
         <button 
           className="md:hidden text-white text-2xl focus:outline-none"
           onClick={() => setIsOpen(!isOpen)}
+          aria-expanded={isOpen}
+          aria-label="Toggle navigation menu"
+          aria-controls="mobile-menu"
         >
           {isOpen ? <FiX /> : <FiMenu />}
         </button>
@@ -59,7 +67,11 @@ const Navbar = () => {
 
       {/* Mobile Navigation */}
       {isOpen && (
-        <div className="md:hidden absolute top-full left-0 w-full bg-[var(--secondary)]/95 backdrop-blur-md py-6 animate-fade-in">
+        <div 
+          id="mobile-menu" 
+          className="md:hidden absolute top-full left-0 w-full navbar-scrolled py-6 animate-fade-in"
+          aria-hidden={!isOpen}
+        >
           <nav className="container-custom">
             <ul className="flex flex-col space-y-4">
               {["home", "about", "portfolio", "contact"].map((item) => (
