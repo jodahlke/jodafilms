@@ -1,0 +1,328 @@
+/* Global Header CSS - RSR Site Implementation */
+
+/* Base Styles */
+.gh-fixed-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  padding: 30px 40px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 1000;
+  transition: all 0.3s ease-in-out;
+  background: linear-gradient(rgba(255, 255, 255, 0), rgba(255, 255, 255, 0));
+}
+
+.gh-fixed-header.scrolled {
+  padding: 15px 40px;
+  background-color: rgba(0, 0, 0, 0.98);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.gh-fixed-header.past-hero {
+  background-color: rgba(0, 0, 0, 0.98) !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.gh-header-container {
+  display: flex;
+  width: 100%;
+  justify-content: center;
+  align-items: center;
+  gap: 50px;
+}
+
+.gh-fixed-header .gh-logo {
+  font-size: 28px;
+  font-weight: 700;
+  color: #fff;
+  text-decoration: none;
+  letter-spacing: 2px;
+  position: absolute;
+  left: 40px;
+}
+
+.gh-fixed-header .gh-logo a {
+  color: #fff;
+  text-decoration: none;
+}
+
+.gh-header-nav ul {
+  display: flex;
+  list-style: none;
+  gap: 40px;
+  margin: 0;
+  padding: 0;
+}
+
+/* Highly specific selectors to override any existing styles */
+body .gh-fixed-header .gh-header-nav ul li a,
+html body .gh-fixed-header .gh-header-nav ul li a {
+  color: #fff;
+  text-decoration: none !important;
+  font-size: 20px;
+  font-weight: 500;
+  position: relative;
+  padding-bottom: 5px;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  border-bottom: none !important;
+  background: transparent;
+  display: inline-block;
+}
+
+body .gh-fixed-header .gh-header-nav ul li a:hover,
+html body .gh-fixed-header .gh-header-nav ul li a:hover {
+  color: #e60000; /* RSR red color */
+  text-decoration: none !important;
+  border-bottom: none !important;
+  background: transparent;
+}
+
+/* Disable any pseudo-elements for header links with very high specificity */
+body .gh-header-nav ul li a::before,
+body .gh-header-nav ul li a::after,
+html body .gh-header-nav ul li a::before,
+html body .gh-header-nav ul li a::after,
+.gh-header-nav ul li a::before,
+.gh-header-nav ul li a::after {
+  display: none !important;
+  content: none !important;
+  opacity: 0 !important;
+  height: 0 !important;
+  width: 0 !important;
+  background: transparent !important;
+  border: none !important;
+}
+
+.gh-menu-btn {
+  position: fixed;
+  top: 30px;
+  right: 40px;
+  z-index: 1001;
+  display: flex;
+  cursor: pointer;
+  width: 30px;
+  height: 30px;
+  justify-content: center;
+  align-items: center;
+  transition: all 0.5s ease-in-out;
+}
+
+.gh-menu-btn__burger {
+  width: 30px;
+  height: 3px;
+  background: #fff;
+  border-radius: 5px;
+  transition: all 0.5s ease-in-out;
+}
+
+.gh-menu-btn__burger::before,
+.gh-menu-btn__burger::after {
+  content: '';
+  position: absolute;
+  width: 30px;
+  height: 3px;
+  background: #fff;
+  border-radius: 5px;
+  transition: all 0.5s ease-in-out;
+}
+
+.gh-menu-btn__burger::before {
+  transform: translateY(-10px);
+}
+
+.gh-menu-btn__burger::after {
+  transform: translateY(10px);
+}
+
+.gh-menu-btn.open .gh-menu-btn__burger {
+  transform: translateX(-50px);
+  background: transparent;
+}
+
+.gh-menu-btn.open .gh-menu-btn__burger::before {
+  transform: rotate(45deg) translate(35px, -35px);
+}
+
+.gh-menu-btn.open .gh-menu-btn__burger::after {
+  transform: rotate(-45deg) translate(35px, 35px);
+}
+
+.gh-fixed-header.scrolled ~ .gh-menu-btn {
+  top: 15px;
+}
+
+/* Navigation Overlay */
+.gh-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.95);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 999;
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 0.5s, visibility 0.5s;
+}
+
+.gh-nav.open {
+  visibility: visible;
+  opacity: 1;
+  transition: opacity 0.5s, visibility 0s;
+}
+
+.gh-nav ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 80px;
+  width: 100%;
+}
+
+.gh-nav ul li {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.5s, transform 0.5s;
+}
+
+.gh-nav.open ul li {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Highly specific selectors for burger menu links */
+body .gh-nav ul li a,
+html body .gh-nav ul li a {
+  color: #fff;
+  text-decoration: none !important;
+  font-size: 52px;
+  font-weight: 600;
+  position: relative;
+  display: inline-block;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  border-bottom: none !important;
+  background: transparent;
+  padding: 10px 0;
+}
+
+/* Disable any pseudo-elements for burger menu links with very high specificity */
+body .gh-nav ul li a::before,
+body .gh-nav ul li a::after,
+html body .gh-nav ul li a::before,
+html body .gh-nav ul li a::after,
+.gh-nav ul li a::before,
+.gh-nav ul li a::after {
+  display: none !important;
+  content: none !important;
+  opacity: 0 !important;
+  height: 0 !important;
+  width: 0 !important;
+  background: transparent !important;
+  border: none !important;
+}
+
+body .gh-nav ul li a:hover,
+html body .gh-nav ul li a:hover {
+  color: #e60000; /* RSR red color */
+  text-decoration: none !important;
+  border-bottom: none !important;
+  background: transparent;
+  transform: scale(1.05);
+  transition: all 0.3s ease;
+}
+
+/* Animation delay for menu items */
+.gh-nav ul li:nth-child(1) { transition-delay: 0.1s; }
+.gh-nav ul li:nth-child(2) { transition-delay: 0.2s; }
+.gh-nav ul li:nth-child(3) { transition-delay: 0.3s; }
+.gh-nav ul li:nth-child(4) { transition-delay: 0.4s; }
+.gh-nav ul li:nth-child(5) { transition-delay: 0.5s; }
+.gh-nav ul li:nth-child(6) { transition-delay: 0.6s; }
+
+/* Scroll Progress Bar */
+.gh-scroll-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: transparent;
+  z-index: 1002;
+  overflow: hidden;
+}
+
+.gh-scroll-progress-bar {
+  height: 100%;
+  width: 0;
+  background-color: #e60000; /* RSR red color */
+  transition: width 0.1s;
+}
+
+/* Red Line */
+#gh-red-line {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background-color: #e60000; /* RSR red color */
+  z-index: 1003;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.6s cubic-bezier(0.165, 0.84, 0.44, 1);
+}
+
+@media (max-width: 992px) {
+  .gh-fixed-header {
+    padding: 20px 30px;
+  }
+  
+  .gh-fixed-header .gh-logo {
+    left: 30px;
+  }
+  
+  .gh-menu-btn {
+    right: 30px;
+  }
+  
+  body .gh-nav ul li a,
+  html body .gh-nav ul li a {
+    font-size: 46px;
+  }
+}
+
+@media (max-width: 768px) {
+  .gh-fixed-header {
+    padding: 15px 20px;
+  }
+  
+  .gh-fixed-header .gh-logo {
+    position: relative;
+    left: 0;
+  }
+  
+  .gh-header-nav {
+    display: none;
+  }
+  
+  body .gh-nav ul li a,
+  html body .gh-nav ul li a {
+    font-size: 38px;
+  }
+  
+  .gh-nav ul {
+    gap: 60px;
+  }
+} 
