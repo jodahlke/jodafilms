@@ -22,6 +22,19 @@ const nextConfig = {
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production' ? { exclude: ['error', 'warn'] } : false,
   },
+  // Exclude HLS .ts files from TypeScript processing
+  webpack: (config, { isServer }) => {
+    // Add a rule to handle .ts files in the public/assets/hls directory as assets
+    config.module.rules.push({
+      test: /\/public\/assets\/hls\/.*\.ts$/,
+      type: 'asset/resource',
+      generator: {
+        filename: 'static/chunks/[path][name].[hash][ext]',
+      },
+    });
+    
+    return config;
+  },
 };
 
 export default nextConfig; 

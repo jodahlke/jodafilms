@@ -5,7 +5,10 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "netlify-build": "next build",
+    "exclude-hls": "node exclude-hls.js",
+    "restore-hls": "node restore-hls.js",
+    "netlify-build": "npm run exclude-hls && next build",
+    "local-build": "npm run exclude-hls && next build && npm run restore-hls",
     "start": "next start",
     "lint": "next lint"
   },
