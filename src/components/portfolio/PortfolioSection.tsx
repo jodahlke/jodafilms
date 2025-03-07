@@ -164,6 +164,31 @@ const PortfolioSection = () => {
     }));
   }, []);
 
+  // Handler for mouse enter on portfolio items
+  const handleMouseEnter = useCallback((item: PortfolioItem, index: number) => {
+    if (!isClient) return;
+    
+    const videoElement = videoRefs.current.get(item.id);
+    if (videoElement) {
+      const playVideo = () => {
+        videoElement.play().catch(error => {
+          console.error(`Video play failed for ${item.title}:`, error);
+        });
+        handleItemInteraction(item.id);
+      };
+      
+      setTimeout(playVideo, 100 * (index % 4));
+    }
+  }, [isClient, handleItemInteraction]);
+
+  // Handler for mouse leave on portfolio items
+  const handleMouseLeave = useCallback((itemId: number) => {
+    const videoElement = videoRefs.current.get(itemId);
+    if (videoElement) {
+      videoElement.pause();
+    }
+  }, []);
+
   // Memoize categories array
   const categories = Array.from(new Set(['All', ...portfolioItems.map(item => item.category)])) as Category[];
   
@@ -220,29 +245,6 @@ const PortfolioSection = () => {
           {filteredItems.map((item, index) => {
             const hasInteracted = interactedItems[item.id] || false;
 
-            const handleMouseEnter = useCallback(() => {
-              if (!isClient) return;
-              
-              const videoElement = videoRefs.current.get(item.id);
-              if (videoElement) {
-                const playVideo = () => {
-                  videoElement.play().catch(error => {
-                    console.error(`Video play failed for ${item.title}:`, error);
-                  });
-                  handleItemInteraction(item.id);
-                };
-                
-                setTimeout(playVideo, 100 * (index % 4));
-              }
-            }, [item.id, item.title, index]);
-
-            const handleMouseLeave = useCallback(() => {
-              const videoElement = videoRefs.current.get(item.id);
-              if (videoElement) {
-                videoElement.pause();
-              }
-            }, [item.id]);
-
             return (
               <motion.div
                 key={item.id}
@@ -252,8 +254,8 @@ const PortfolioSection = () => {
                 transition={{ duration: 0.5, delay: index * 0.1 }}
                 className="group relative overflow-hidden aspect-video cursor-pointer hover:shadow-2xl transition-all duration-300 hover:scale-[1.02]"
                 onClick={() => openModal(item)}
-                onMouseEnter={handleMouseEnter}
-                onMouseLeave={handleMouseLeave}
+                onMouseEnter={() => handleMouseEnter(item, index)}
+                onMouseLeave={() => handleMouseLeave(item.id)}
               >
                 {/* Thumbnail */}
                 <div className={`absolute inset-0 z-10 transition-opacity duration-300 ${hasInteracted && isClient ? 'opacity-0' : 'opacity-100'}`}>
