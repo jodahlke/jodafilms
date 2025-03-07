@@ -109,10 +109,15 @@ const PortfolioSection = () => {
   const [filter, setFilter] = useState("All");
   const [interactedItems, setInteractedItems] = useState<{[key: number]: boolean}>({});
   const [isClient, setIsClient] = useState(false);
+  const [baseUrl, setBaseUrl] = useState('');
 
   useEffect(() => {
     // Mark that we're on the client side
     setIsClient(true);
+    // Set base URL for assets
+    if (typeof window !== 'undefined') {
+      setBaseUrl(window.location.origin);
+    }
   }, []);
 
   const openModal = (item: typeof portfolioItems[0]) => {
@@ -136,6 +141,11 @@ const PortfolioSection = () => {
   const filteredItems = filter === "All" 
     ? portfolioItems 
     : portfolioItems.filter(item => item.category === filter);
+
+  // Function to get absolute URL
+  const getVideoUrl = (relativePath: string) => {
+    return isClient ? `${baseUrl}${relativePath}` : relativePath;
+  };
 
   return (
     <section id="portfolio" className="section-padding">
@@ -234,9 +244,10 @@ const PortfolioSection = () => {
                       muted
                       playsInline
                       preload="none"
+                      onError={(e) => console.error(`Video error for ${item.title}:`, e)}
                     >
                       {hasInteracted && (
-                        <source src={item.videoSrc} type="video/webm" />
+                        <source src={getVideoUrl(item.videoSrc)} type="video/webm" />
                       )}
                     </video>
                   </div>
@@ -288,7 +299,7 @@ const PortfolioSection = () => {
                 autoPlay
                 playsInline
               >
-                <source src={selectedItem.videoSrc} type="video/webm" />
+                <source src={getVideoUrl(selectedItem.videoSrc)} type="video/webm" />
                 Your browser does not support the video tag.
               </video>
             </div>

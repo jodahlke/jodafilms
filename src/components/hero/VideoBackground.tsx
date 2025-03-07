@@ -10,24 +10,49 @@ export default function VideoBackground({ fallbackImageUrl }: VideoBackgroundPro
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoLoaded, setVideoLoaded] = useState(false);
   const [videoError, setVideoError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string>('');
+  const [debugInfo, setDebugInfo] = useState<string>('');
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
 
+    // Create absolute URLs
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+    const webmSource = `${baseUrl}/assets/videos/hero/hero-video.webm`;
+    
+    // Add sources programmatically to ensure correct URLs
+    const webmSourceElement = document.createElement('source');
+    webmSourceElement.src = webmSource;
+    webmSourceElement.type = 'video/webm';
+    video.appendChild(webmSourceElement);
+
+    setDebugInfo(`Attempting to load video from: ${webmSource}`);
+    
     const handleCanPlay = () => {
       console.log('Video can play now');
       setVideoLoaded(true);
+      setDebugInfo(prev => `${prev}\nVideo loaded successfully`);
     };
 
     const handleError = (e: Event) => {
-      console.error('Video error:', e);
+      const error = (video.error?.message || 'Unknown error') + 
+                    ` (code: ${video.error?.code || 'unknown'})`;
+      console.error('Video error:', error);
+      setErrorMessage(error);
       setVideoError(true);
+      setDebugInfo(prev => `${prev}\nError: ${error}`);
     };
 
     // Add event listeners
     video.addEventListener('canplay', handleCanPlay);
     video.addEventListener('error', handleError);
+    
+    // For network errors
+    window.addEventListener('online', () => {
+      setDebugInfo(prev => `${prev}\nNetwork connection restored. Reloading video.`);
+      video.load();
+    });
 
     // Attempt to load and play
     video.load();
@@ -35,9 +60,13 @@ export default function VideoBackground({ fallbackImageUrl }: VideoBackgroundPro
     const playPromise = video.play();
     if (playPromise !== undefined) {
       playPromise
-        .then(() => console.log('Video playing successfully'))
+        .then(() => {
+          console.log('Video playing successfully');
+          setDebugInfo(prev => `${prev}\nVideo playing successfully`);
+        })
         .catch(err => {
           console.error('Video play failed:', err);
+          setDebugInfo(prev => `${prev}\nPlay failed: ${err.message || err}`);
           // Some browsers won't autoplay without user interaction
           // We'll show the fallback image in this case
           setVideoError(true);
@@ -59,6 +88,15 @@ export default function VideoBackground({ fallbackImageUrl }: VideoBackgroundPro
         </div>
       )}
       
+      {/* Debug info in development */}
+      {process.env.NODE_ENV !== 'production' && videoError && (
+        <div className="absolute bottom-4 left-4 right-4 bg-black/80 text-white p-4 text-xs z-50 max-h-48 overflow-auto">
+          <h4 className="font-bold">Video Debug Info:</h4>
+          <p className="text-red-400">{errorMessage}</p>
+          <pre className="mt-2 whitespace-pre-wrap">{debugInfo}</pre>
+        </div>
+      )}
+      
       {/* Fallback image always rendered but hidden when video plays */}
       <div 
         className={`absolute inset-0 bg-cover bg-center transition-opacity duration-1000 ${videoLoaded && !videoError ? 'opacity-0' : 'opacity-100'}`}
@@ -76,8 +114,7 @@ export default function VideoBackground({ fallbackImageUrl }: VideoBackgroundPro
         preload="auto"
         poster={fallbackImageUrl}
       >
-        <source src="/assets/videos/hero/hero-video.webm" type="video/webm" />
-        <source src="/assets/videos/hero/hero-video.mp4" type="video/mp4" />
+        {/* Sources will be added programmatically in useEffect */}
       </video>
     </div>
   );
