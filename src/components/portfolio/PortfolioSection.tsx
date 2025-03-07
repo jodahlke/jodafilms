@@ -245,7 +245,10 @@ const PortfolioSection = () => {
         }
         
         // Set video source
-        videoElement.src = getVideoUrl(item.videoSrc);
+        const source = document.createElement('source');
+        source.src = getVideoUrl(item.videoSrc);
+        source.type = 'video/mp4';
+        videoElement.appendChild(source);
         
         // Load the video
         videoElement.load();
@@ -255,10 +258,19 @@ const PortfolioSection = () => {
       }
       
       // Play the video (will resume from where it was paused)
-      const playVideo = () => {
-        videoElement.play().catch(error => {
-          console.error(`Video play failed for ${item.title}:`, error);
-        });
+      const playVideo = async () => {
+        try {
+          // Reset the video if it ended
+          if (videoElement.ended) {
+            videoElement.currentTime = 0;
+          }
+          await videoElement.play();
+        } catch (error: unknown) {
+          // Don't show error in console for user interaction required error
+          if (error instanceof Error && error.name !== 'NotAllowedError') {
+            console.error(`Video play failed for ${item.title}:`, error);
+          }
+        }
       };
       
       setTimeout(playVideo, 100 * (index % 4));
@@ -371,8 +383,12 @@ const PortfolioSection = () => {
                       className="w-full h-full object-cover"
                       muted
                       playsInline
-                      preload="none"
-                      onError={(e) => console.error(`Video error for ${item.title}:`, e)}
+                      preload="metadata"
+                      loop
+                      onError={(e) => {
+                        const target = e.target as HTMLVideoElement;
+                        console.error(`Video error for ${item.title}:`, e, target.error);
+                      }}
                     />
                   </div>
                 )}
@@ -433,17 +449,16 @@ const PortfolioSection = () => {
                 )}
                 
                 {/* Video element - only shown when playing */}
-                {isModalVideoPlaying && (
-                  <div className="absolute inset-0 z-20 bg-black">
+                <div className={`absolute inset-0 z-20 bg-black ${isModalVideoPlaying ? 'opacity-100' : 'opacity-0'}`}>
+                  {isModalVideoPlaying && (
                     <video
                       key={`${selectedItem.id}-${retryCount}`}
                       className="w-full h-full object-cover"
                       controls
-                      autoPlay
                       playsInline
                       preload="auto"
                       poster={selectedItem.thumbnail}
-                      src={getVideoUrl(selectedItem.videoSrc)}
+                      ref={modalVideoRef}
                       onLoadStart={() => {
                         setIsModalVideoLoading(true);
                         console.log('Video load started');
@@ -451,9 +466,16 @@ const PortfolioSection = () => {
                       onCanPlay={() => {
                         setIsModalVideoLoading(false);
                         console.log('Video can play');
+                        // Start playing as soon as the video can play
+                        if (modalVideoRef.current) {
+                          modalVideoRef.current.play().catch(error => {
+                            console.error('Auto-play failed:', error);
+                          });
+                        }
                       }}
                       onError={(e) => {
-                        console.error('Modal video error:', e);
+                        const target = e.target as HTMLVideoElement;
+                        console.error('Modal video error:', e, target.error);
                         setModalVideoError(true);
                         setIsModalVideoLoading(false);
                         setIsModalVideoPlaying(false);
@@ -462,9 +484,11 @@ const PortfolioSection = () => {
                         setIsModalVideoLoading(false);
                         setModalVideoError(false);
                       }}
-                    />
-                  </div>
-                )}
+                    >
+                      <source src={getVideoUrl(selectedItem.videoSrc)} type="video/mp4" />
+                    </video>
+                  )}
+                </div>
 
                 {/* Loading spinner */}
                 {isModalVideoLoading && (
@@ -477,7 +501,7 @@ const PortfolioSection = () => {
                 {!isModalVideoPlaying && !modalVideoError && !isModalVideoLoading && (
                   <div 
                     className="absolute inset-0 z-30 flex items-center justify-center bg-black/30 hover:bg-black/40 transition-colors cursor-pointer"
-                    onClick={() => {
+                    onClick={async () => {
                       console.log('Play button clicked');
                       setIsModalVideoPlaying(true);
                     }}
