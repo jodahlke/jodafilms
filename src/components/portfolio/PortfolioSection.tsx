@@ -240,31 +240,15 @@ const PortfolioSection = () => {
     if (modalVideoRef.current && selectedItem) {
       const modalVideo = modalVideoRef.current;
       
-      // Force video source using direct URL
-      const videoSource = getVideoUrl(selectedItem.videoSrc);
+      // We'll use a much simpler approach: just set the src directly
+      modalVideo.src = getVideoUrl(selectedItem.videoSrc);
       
-      // Directly set the source attribute instead of using child elements
-      // This works better on mobile
-      modalVideo.src = videoSource;
-      
-      // For Safari mobile compatibility
+      // Force browser to recognize the change
       modalVideo.load();
-      
-      // On mobile devices, we don't autoplay - instead rely on user clicking the play control
-      // This is more reliable and avoids restrictions
-      if (!isMobile) {
-        // Only try autoplay on desktop
-        setTimeout(() => {
-          modalVideo.play().catch(error => {
-            console.error('Modal video play error:', error);
-            // Play failed, but controls are visible so user can play manually
-          });
-        }, 300);
-      }
     }
-  }, [selectedItem, getVideoUrl, isMobile]);
+  }, [selectedItem, getVideoUrl]);
 
-  // When modal opens, ensure video plays
+  // When modal opens, ensure video is set up properly
   useEffect(() => {
     if (modalIsOpen && selectedItem) {
       ensureModalVideoPlays();
@@ -394,6 +378,7 @@ const PortfolioSection = () => {
             
             {/* Video Section */}
             <div className="relative aspect-video w-full bg-black">
+              {/* Simple video element with direct src */}
               <video
                 ref={modalVideoRef}
                 className="w-full h-full object-cover"
@@ -401,14 +386,16 @@ const PortfolioSection = () => {
                 playsInline
                 preload="auto"
                 poster={selectedItem.thumbnail}
-                controlsList="nodownload"
               />
               
-              {/* Add play button overlay for mobile */}
+              {/* Mobile play indicator - purely visual, not interactive */}
               {isMobile && (
-                <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                  <div className="bg-[var(--primary)]/50 rounded-full p-4 animate-pulse pointer-events-none">
-                    <FiPlay className="w-12 h-12 text-white" />
+                <div 
+                  className="absolute inset-0 flex items-center justify-center pointer-events-none"
+                  style={{ opacity: 0.6 }}
+                >
+                  <div className="bg-[var(--primary)]/70 rounded-full p-5 animate-pulse">
+                    <FiPlay className="w-14 h-14 text-white" />
                   </div>
                 </div>
               )}
