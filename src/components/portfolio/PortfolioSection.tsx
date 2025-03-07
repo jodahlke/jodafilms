@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { motion } from "framer-motion";
 import Modal from "react-modal";
-import { FiX, FiExternalLink, FiVideo } from "react-icons/fi";
+import { FiX, FiExternalLink, FiVideo, FiPlay } from "react-icons/fi";
 import Image from "next/image";
 
 // Bind modal to document element
@@ -114,9 +114,33 @@ const PortfolioSection = () => {
   const [interactedItems, setInteractedItems] = useState<{[key: number]: boolean}>({});
   const [isClient, setIsClient] = useState(false);
   const [baseUrl, setBaseUrl] = useState('');
+  const [isMobile, setIsMobile] = useState(false);
   
   // Create a map of video refs outside the render loop
   const videoRefs = useRef<Map<number, HTMLVideoElement | null>>(new Map());
+
+  // Detect mobile devices
+  useEffect(() => {
+    const checkMobile = () => {
+      const userAgent = 
+        typeof navigator !== 'undefined' ? navigator.userAgent : '';
+      const mobile = Boolean(
+        userAgent.match(
+          /Android|BlackBerry|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i
+        )
+      );
+      return mobile || (typeof window !== 'undefined' && window.innerWidth < 768);
+    };
+
+    setIsMobile(checkMobile());
+    
+    const handleResize = () => {
+      setIsMobile(checkMobile());
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Cleanup function for videos
   const cleanupVideos = useCallback(() => {
@@ -216,39 +240,29 @@ const PortfolioSection = () => {
     if (modalVideoRef.current && selectedItem) {
       const modalVideo = modalVideoRef.current;
       
-      // Set the src properly
+      // Force video source using direct URL
       const videoSource = getVideoUrl(selectedItem.videoSrc);
       
-      // Create a new source element
-      const source = document.createElement('source');
-      source.src = videoSource;
-      source.type = 'video/webm';
+      // Directly set the source attribute instead of using child elements
+      // This works better on mobile
+      modalVideo.src = videoSource;
       
-      // Remove existing sources
-      while (modalVideo.firstChild) {
-        modalVideo.removeChild(modalVideo.firstChild);
-      }
-      
-      // Add the new source
-      modalVideo.appendChild(source);
-      
-      // Load and play - this handle works better for mobile
+      // For Safari mobile compatibility
       modalVideo.load();
       
-      // Use a small timeout to ensure DOM updates have processed
-      setTimeout(() => {
-        const playPromise = modalVideo.play();
-        if (playPromise !== undefined) {
-          playPromise.catch(error => {
+      // On mobile devices, we don't autoplay - instead rely on user clicking the play control
+      // This is more reliable and avoids restrictions
+      if (!isMobile) {
+        // Only try autoplay on desktop
+        setTimeout(() => {
+          modalVideo.play().catch(error => {
             console.error('Modal video play error:', error);
-            
-            // On mobile, we might need user interaction
-            // The video controls will be visible so the user can tap play
+            // Play failed, but controls are visible so user can play manually
           });
-        }
-      }, 100);
+        }, 300);
+      }
     }
-  }, [selectedItem, getVideoUrl]);
+  }, [selectedItem, getVideoUrl, isMobile]);
 
   // When modal opens, ensure video plays
   useEffect(() => {
@@ -379,20 +393,25 @@ const PortfolioSection = () => {
             </button>
             
             {/* Video Section */}
-            <div className="relative aspect-video w-full bg-[var(--secondary)]">
+            <div className="relative aspect-video w-full bg-black">
               <video
                 ref={modalVideoRef}
                 className="w-full h-full object-cover"
                 controls
-                controlsList="nodownload"
                 playsInline
-                autoPlay={false} /* We'll handle this manually */
                 preload="auto"
-              >
-                {/* Sources will be added programmatically */}
-                <source src={getVideoUrl(selectedItem.videoSrc)} type="video/webm" />
-                Your browser does not support the video tag.
-              </video>
+                poster={selectedItem.thumbnail}
+                controlsList="nodownload"
+              />
+              
+              {/* Add play button overlay for mobile */}
+              {isMobile && (
+                <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                  <div className="bg-[var(--primary)]/50 rounded-full p-4 animate-pulse pointer-events-none">
+                    <FiPlay className="w-12 h-12 text-white" />
+                  </div>
+                </div>
+              )}
             </div>
             
             {/* Project Details */}

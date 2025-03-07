@@ -11,24 +11,27 @@ export default function VideoBackground({ fallbackImageUrl }: VideoBackgroundPro
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoLoaded, setVideoLoaded] = useState(false);
   const [videoError, setVideoError] = useState(false);
+  const [videoPlaying, setVideoPlaying] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [debugInfo, setDebugInfo] = useState<string>('');
   const [isMobile, setIsMobile] = useState(false);
-  const [needsUserInteraction, setNeedsUserInteraction] = useState(false);
+  const [videoUrl, setVideoUrl] = useState('');
 
   // Detect mobile device
   useEffect(() => {
-    // Simple mobile detection
     const checkMobile = () => {
-      return (
-        typeof window !== 'undefined' && 
-        (window.innerWidth <= 768 || 
-        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent))
+      const userAgent = 
+        typeof navigator !== 'undefined' ? navigator.userAgent : '';
+      const mobile = Boolean(
+        userAgent.match(
+          /Android|BlackBerry|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i
+        )
       );
+      return mobile || (typeof window !== 'undefined' && window.innerWidth < 768);
     };
 
     setIsMobile(checkMobile());
-
+    
     const handleResize = () => {
       setIsMobile(checkMobile());
     };
@@ -37,98 +40,105 @@ export default function VideoBackground({ fallbackImageUrl }: VideoBackgroundPro
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Set up video source
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const baseUrl = window.location.origin;
+      setVideoUrl(`${baseUrl}/assets/videos/hero/hero-video.webm`);
+    }
+  }, []);
+
+  // Handle video loading and events
   useEffect(() => {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video || !videoUrl) return;
 
-    // Create absolute URLs
-    const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-    const webmSource = `${baseUrl}/assets/videos/hero/hero-video.webm`;
-    
-    // Add sources programmatically to ensure correct URLs
-    const webmSourceElement = document.createElement('source');
-    webmSourceElement.src = webmSource;
-    webmSourceElement.type = 'video/webm';
-    video.appendChild(webmSourceElement);
-
-    setDebugInfo(`Attempting to load video from: ${webmSource}`);
-    
-    const handleCanPlay = () => {
-      console.log('Video can play now');
+    // Set up event listeners
+    const handleLoadedData = () => {
+      console.log('Video data loaded');
       setVideoLoaded(true);
-      setDebugInfo(prev => `${prev}\nVideo loaded successfully`);
-
-      // Only try to autoplay on non-mobile devices
+      setVideoError(false);
+      
+      // Only attempt autoplay on desktop
       if (!isMobile) {
-        attemptAutoplay();
-      } else {
-        // On mobile, we'll wait for user interaction
-        setNeedsUserInteraction(true);
+        handlePlayAttempt();
       }
     };
 
-    const attemptAutoplay = () => {
-      const playPromise = video.play();
-      if (playPromise !== undefined) {
-        playPromise
-          .then(() => {
-            console.log('Video playing successfully');
-            setDebugInfo(prev => `${prev}\nVideo playing successfully`);
-            setNeedsUserInteraction(false);
-          })
-          .catch(err => {
-            console.error('Video play failed:', err);
-            setDebugInfo(prev => `${prev}\nPlay failed: ${err.message || err}`);
-            // We'll show the play button in this case
-            setNeedsUserInteraction(true);
-          });
-      }
-    };
-
-    const handleError = (e: Event) => {
-      const error = (video.error?.message || 'Unknown error') + 
-                    ` (code: ${video.error?.code || 'unknown'})`;
-      console.error('Video error:', error);
+    const handleError = () => {
+      const error = video.error 
+        ? `Error code: ${video.error.code}, message: ${video.error.message}` 
+        : 'Unknown video error';
+      console.error(error);
       setErrorMessage(error);
       setVideoError(true);
-      setDebugInfo(prev => `${prev}\nError: ${error}`);
+      setVideoPlaying(false);
     };
 
-    // Add event listeners
-    video.addEventListener('canplay', handleCanPlay);
+    const handlePlaying = () => {
+      setVideoPlaying(true);
+      console.log('Video is now playing');
+    };
+
+    const handlePause = () => {
+      setVideoPlaying(false);
+      console.log('Video is paused');
+    };
+
+    // Add listeners
+    video.addEventListener('loadeddata', handleLoadedData);
     video.addEventListener('error', handleError);
-    
-    // For network errors
-    window.addEventListener('online', () => {
-      setDebugInfo(prev => `${prev}\nNetwork connection restored. Reloading video.`);
+    video.addEventListener('playing', handlePlaying);
+    video.addEventListener('pause', handlePause);
+
+    // Set source directly
+    if (!video.src) {
+      video.src = videoUrl;
       video.load();
-    });
+    }
 
-    // Attempt to load video
-    video.load();
-    
     return () => {
-      video.removeEventListener('canplay', handleCanPlay);
+      // Remove listeners on cleanup
+      video.removeEventListener('loadeddata', handleLoadedData);
       video.removeEventListener('error', handleError);
+      video.removeEventListener('playing', handlePlaying);
+      video.removeEventListener('pause', handlePause);
     };
-  }, [isMobile]);
+  }, [videoUrl, isMobile]);
 
-  // Function to manually play video (for mobile or when autoplay is blocked)
-  const handlePlayButtonClick = () => {
+  // Function to handle play attempts
+  const handlePlayAttempt = () => {
     const video = videoRef.current;
     if (!video) return;
+
+    console.log('Attempting to play video...');
     
-    // Try to play
+    // Reset video if it ended
+    if (video.ended) {
+      video.currentTime = 0;
+    }
+    
+    // Make play attempt with better error handling
     video.play()
       .then(() => {
-        setNeedsUserInteraction(false);
+        console.log('Play command accepted');
+        setVideoPlaying(true);
         setVideoError(false);
       })
       .catch(err => {
-        console.error('Manual play failed:', err);
-        setDebugInfo(prev => `${prev}\nManual play failed: ${err.message || err}`);
+        console.error('Play failed:', err.message);
+        setVideoPlaying(false);
+        // Don't set error to true - we'll show the play button instead
       });
   };
+
+  // Handle play button click
+  const handlePlayButtonClick = () => {
+    handlePlayAttempt();
+  };
+
+  // Determine if we should show the play button
+  const showPlayButton = videoLoaded && !videoPlaying && (isMobile || !videoPlaying);
 
   return (
     <div className="absolute inset-0 z-0 bg-black">
@@ -139,15 +149,15 @@ export default function VideoBackground({ fallbackImageUrl }: VideoBackgroundPro
         </div>
       )}
       
-      {/* Play button - shown when autoplay is blocked or on mobile */}
-      {needsUserInteraction && videoLoaded && !videoError && (
+      {/* Play button */}
+      {showPlayButton && (
         <button 
           onClick={handlePlayButtonClick}
-          className="absolute inset-0 z-30 flex items-center justify-center bg-black/40 hover:bg-black/60 transition-colors"
-          aria-label="Play video"
+          className="absolute inset-0 z-20 flex items-center justify-center bg-black/40 hover:bg-black/60 transition-colors"
+          aria-label="Play background video"
         >
           <div className="bg-[var(--primary)] rounded-full p-4 animate-pulse">
-            <FiPlay className="w-10 h-10 text-white" />
+            <FiPlay className="w-12 h-12 text-white" />
           </div>
         </button>
       )}
@@ -161,25 +171,23 @@ export default function VideoBackground({ fallbackImageUrl }: VideoBackgroundPro
         </div>
       )}
       
-      {/* Fallback image always rendered but hidden when video plays */}
+      {/* Fallback image - shown until video is playing */}
       <div 
-        className={`absolute inset-0 bg-cover bg-center transition-opacity duration-1000 ${videoLoaded && !videoError && !needsUserInteraction ? 'opacity-0' : 'opacity-100'}`}
+        className={`absolute inset-0 bg-cover bg-center transition-opacity duration-1000 ${videoPlaying ? 'opacity-0' : 'opacity-100'}`}
         style={{ backgroundImage: `url('${fallbackImageUrl}')` }}
-        aria-hidden={videoLoaded && !videoError && !needsUserInteraction ? 'true' : 'false'}
+        aria-hidden={videoPlaying ? 'true' : 'false'}
       />
       
       {/* Video */}
       <video
         ref={videoRef}
-        className={`object-cover w-full h-full transition-opacity duration-1000 ${videoLoaded && !videoError && !needsUserInteraction ? 'opacity-100' : 'opacity-0'}`}
+        className={`object-cover w-full h-full transition-opacity duration-1000 ${videoPlaying ? 'opacity-100' : 'opacity-0'}`}
         muted
         loop
         playsInline
         preload="auto"
         poster={fallbackImageUrl}
-      >
-        {/* Sources will be added programmatically in useEffect */}
-      </video>
+      />
     </div>
   );
 } 
