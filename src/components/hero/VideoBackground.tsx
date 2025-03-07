@@ -12,9 +12,9 @@ export default function VideoBackground({ fallbackImageUrl }: VideoBackgroundPro
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [videoLoading, setVideoLoading] = useState(true);
-  const [autoplayAttempted, setAutoplayAttempted] = useState(false);
+  const [isSafari, setIsSafari] = useState(false);
   
-  // Mobile detection
+  // Browser detection
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
@@ -22,7 +22,13 @@ export default function VideoBackground({ fallbackImageUrl }: VideoBackgroundPro
       return window.innerWidth < 768 || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     };
     
+    const detectSafari = () => {
+      const ua = navigator.userAgent.toLowerCase();
+      return ua.indexOf('safari') !== -1 && ua.indexOf('chrome') === -1;
+    };
+    
     setIsMobile(detectMobile());
+    setIsSafari(detectSafari());
     
     const handleResize = () => {
       setIsMobile(detectMobile());
@@ -37,100 +43,70 @@ export default function VideoBackground({ fallbackImageUrl }: VideoBackgroundPro
     const video = videoRef.current;
     if (!video) return;
     
-    // Clear any existing sources
-    while (video.firstChild) {
-      video.removeChild(video.firstChild);
-    }
-    
-    // Set the video sources with proper fallbacks
+    // Set video source based on browser
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-    
-    // Add MP4 source first for Safari compatibility
-    const mp4Source = document.createElement('source');
-    mp4Source.src = `${baseUrl}/assets/videos/Mp4 Fallback/hero-video.mp4`;
-    mp4Source.type = 'video/mp4';
-    video.appendChild(mp4Source);
-    
-    // Add WebM source as second option for other browsers
-    const webmSource = document.createElement('source');
-    webmSource.src = `${baseUrl}/assets/videos/hero/hero-video.webm`;
-    webmSource.type = 'video/webm';
-    video.appendChild(webmSource);
+    video.src = isSafari 
+      ? `${baseUrl}/assets/videos/Mp4 Fallback/hero-video.mp4`
+      : `${baseUrl}/assets/videos/hero/hero-video.webm`;
     
     const handleCanPlay = () => {
+      console.log('Video can play');
       setVideoLoading(false);
       
-      // Try to autoplay on both mobile and desktop
-      if (!autoplayAttempted) {
-        setAutoplayAttempted(true);
-        video.play().then(() => {
-          setIsPlaying(true);
-        }).catch(err => {
-          console.error('Autoplay failed:', err);
-          // Keep fallback image showing if autoplay fails
-        });
-      }
+      // Try to autoplay
+      video.play().then(() => {
+        console.log('Autoplay successful');
+        setIsPlaying(true);
+      }).catch(err => {
+        console.error('Autoplay failed:', err);
+      });
     };
     
     const handlePlay = () => {
+      console.log('Video playing');
       setIsPlaying(true);
     };
     
     const handlePause = () => {
+      console.log('Video paused');
       setIsPlaying(false);
+    };
+    
+    const handleError = (e: Event) => {
+      console.error('Video error:', e);
+      setVideoLoading(false);
     };
     
     // Add event listeners
     video.addEventListener('canplay', handleCanPlay);
     video.addEventListener('play', handlePlay);
     video.addEventListener('pause', handlePause);
+    video.addEventListener('error', handleError);
     
     // Load the video
     video.load();
     
     return () => {
-      // Clean up event listeners
       video.removeEventListener('canplay', handleCanPlay);
       video.removeEventListener('play', handlePlay);
       video.removeEventListener('pause', handlePause);
+      video.removeEventListener('error', handleError);
     };
-  }, [autoplayAttempted]);
+  }, [isSafari]);
   
-  // Play button handler - simplified
+  // Play button handler
   const handlePlayClick = () => {
     const video = videoRef.current;
     if (!video) return;
     
-    // Mobile browsers often require user interaction before playing,
-    // so we need a direct play call from a user event handler
-    video.play()
-      .then(() => {
-        setIsPlaying(true);
-      })
-      .catch(err => {
-        console.error('Play failed on click:', err);
-      });
+    console.log('Play button clicked');
+    video.play().then(() => {
+      console.log('Play on click successful');
+      setIsPlaying(true);
+    }).catch(err => {
+      console.error('Play failed on click:', err);
+    });
   };
-  
-  // Auto-attempt playback on scroll
-  useEffect(() => {
-    if (typeof window === 'undefined' || isPlaying) return;
-    
-    const handleScroll = () => {
-      const video = videoRef.current;
-      if (!video || isPlaying) return;
-      
-      // Try to play the video when user scrolls
-      video.play().then(() => {
-        setIsPlaying(true);
-      }).catch(err => {
-        // Silent catch - we'll keep trying on scroll
-      });
-    };
-    
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [isPlaying]);
   
   return (
     <div className="absolute inset-0 z-0 bg-black">
