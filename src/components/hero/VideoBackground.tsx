@@ -12,6 +12,7 @@ export default function VideoBackground({ fallbackImageUrl }: VideoBackgroundPro
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [videoLoading, setVideoLoading] = useState(true);
+  const [autoplayAttempted, setAutoplayAttempted] = useState(false);
   
   // Mobile detection
   useEffect(() => {
@@ -36,16 +37,35 @@ export default function VideoBackground({ fallbackImageUrl }: VideoBackgroundPro
     const video = videoRef.current;
     if (!video) return;
     
-    // Set the video source to ensure correct path
+    // Clear any existing sources
+    while (video.firstChild) {
+      video.removeChild(video.firstChild);
+    }
+    
+    // Set the video sources with proper fallbacks
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-    video.src = `${baseUrl}/assets/videos/hero/hero-video.webm`;
+    
+    // Add MP4 source first for Safari compatibility
+    const mp4Source = document.createElement('source');
+    mp4Source.src = `${baseUrl}/assets/videos/Mp4 Fallback/hero-video.mp4`;
+    mp4Source.type = 'video/mp4';
+    video.appendChild(mp4Source);
+    
+    // Add WebM source as second option for other browsers
+    const webmSource = document.createElement('source');
+    webmSource.src = `${baseUrl}/assets/videos/hero/hero-video.webm`;
+    webmSource.type = 'video/webm';
+    video.appendChild(webmSource);
     
     const handleCanPlay = () => {
       setVideoLoading(false);
       
-      // On desktop, try to autoplay
-      if (!isMobile) {
-        video.play().catch(err => {
+      // Try to autoplay on both mobile and desktop
+      if (!autoplayAttempted) {
+        setAutoplayAttempted(true);
+        video.play().then(() => {
+          setIsPlaying(true);
+        }).catch(err => {
           console.error('Autoplay failed:', err);
           // Keep fallback image showing if autoplay fails
         });
@@ -74,7 +94,7 @@ export default function VideoBackground({ fallbackImageUrl }: VideoBackgroundPro
       video.removeEventListener('play', handlePlay);
       video.removeEventListener('pause', handlePause);
     };
-  }, [isMobile]);
+  }, [autoplayAttempted]);
   
   // Play button handler - simplified
   const handlePlayClick = () => {
@@ -91,6 +111,26 @@ export default function VideoBackground({ fallbackImageUrl }: VideoBackgroundPro
         console.error('Play failed on click:', err);
       });
   };
+  
+  // Auto-attempt playback on scroll
+  useEffect(() => {
+    if (typeof window === 'undefined' || isPlaying) return;
+    
+    const handleScroll = () => {
+      const video = videoRef.current;
+      if (!video || isPlaying) return;
+      
+      // Try to play the video when user scrolls
+      video.play().then(() => {
+        setIsPlaying(true);
+      }).catch(err => {
+        // Silent catch - we'll keep trying on scroll
+      });
+    };
+    
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [isPlaying]);
   
   return (
     <div className="absolute inset-0 z-0 bg-black">

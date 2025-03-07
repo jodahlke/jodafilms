@@ -19,6 +19,7 @@ const portfolioItems = [
     category: "Commercial",
     thumbnail: "/assets/videos/thumbnails/kasakundavi.jpg",
     videoSrc: "/assets/videos/Portfolio WEBM/Kasa Kundavi.webm",
+    mp4VideoSrc: "/assets/videos/Mp4 Fallback/Portfolio/Kasa Kundavi.mp4",
     description: "A captivating commercial that showcases the essence of Kasa Kundavi, blending traditional values with modern storytelling.",
     role: "Director & Cinematographer",
     year: 2023,
@@ -30,6 +31,7 @@ const portfolioItems = [
     category: "Documentary",
     thumbnail: "/assets/videos/thumbnails/hawaii-alex-smith.jpg",
     videoSrc: "/assets/videos/Portfolio WEBM/alex smith.webm",
+    mp4VideoSrc: "/assets/videos/Mp4 Fallback/Portfolio/alex smith.mp4",
     description: "An intimate documentary portrait capturing the journey and passion of Alex Smith.",
     role: "Director of Photography",
     year: 2023,
@@ -41,6 +43,7 @@ const portfolioItems = [
     category: "Corporate",
     thumbnail: "/assets/videos/thumbnails/blowupmedia.jpg",
     videoSrc: "/assets/videos/Portfolio WEBM/blowupmedia.webm",
+    mp4VideoSrc: "/assets/videos/Mp4 Fallback/Portfolio/blowupmedia.mp4",
     description: "A dynamic corporate video showcasing Blowup Media's innovative approach to digital advertising.",
     role: "Director & Editor",
     year: 2023,
@@ -52,6 +55,7 @@ const portfolioItems = [
     category: "Commercial",
     thumbnail: "/assets/videos/thumbnails/mrge.jpg",
     videoSrc: "/assets/videos/Portfolio WEBM/mrge.webm",
+    mp4VideoSrc: "/assets/videos/Mp4 Fallback/Portfolio/mrge.mp4",
     description: "A sleek and modern commercial highlighting MRGE's cutting-edge products and services.",
     role: "Cinematographer",
     year: 2023,
@@ -63,6 +67,7 @@ const portfolioItems = [
     category: "Commercial",
     thumbnail: "/assets/videos/thumbnails/mvmt.jpg",
     videoSrc: "/assets/videos/Portfolio WEBM/mvmt.webm",
+    mp4VideoSrc: "/assets/videos/Mp4 Fallback/Portfolio/mvmt.mp4",
     description: "A stylish commercial for MVMT watches, capturing the essence of modern lifestyle and fashion.",
     role: "Director & Cinematographer",
     year: 2023,
@@ -74,6 +79,7 @@ const portfolioItems = [
     category: "Commercial",
     thumbnail: "/assets/videos/thumbnails/radio912.jpg",
     videoSrc: "/assets/videos/Portfolio WEBM/radio912.webm",
+    mp4VideoSrc: "/assets/videos/Mp4 Fallback/Portfolio/radio912.mp4",
     description: "An energetic commercial for Radio 912, bringing sound and visuals together in perfect harmony.",
     role: "Director",
     year: 2023,
@@ -85,6 +91,7 @@ const portfolioItems = [
     category: "Commercial",
     thumbnail: "/assets/videos/thumbnails/sl.jpg",
     videoSrc: "/assets/videos/Portfolio WEBM/sl.webm",
+    mp4VideoSrc: "/assets/videos/Mp4 Fallback/Portfolio/sl.mp4",
     description: "A compelling commercial that tells the story of SL through sophisticated cinematography.",
     role: "Director of Photography",
     year: 2023,
@@ -96,6 +103,7 @@ const portfolioItems = [
     category: "Commercial",
     thumbnail: "/assets/videos/thumbnails/vinature.jpg",
     videoSrc: "/assets/videos/Portfolio WEBM/vinature.webm",
+    mp4VideoSrc: "/assets/videos/Mp4 Fallback/Portfolio/vinature.mp4",
     description: "An artistic commercial for Vinature, celebrating the beauty of natural wine and sustainable practices.",
     role: "Director & Cinematographer",
     year: 2023,
@@ -115,9 +123,23 @@ const PortfolioSection = () => {
   const [isClient, setIsClient] = useState(false);
   const [baseUrl, setBaseUrl] = useState('');
   const [isMobile, setIsMobile] = useState(false);
+  const [isSafari, setIsSafari] = useState(false);
   
   // Create a map of video refs outside the render loop
   const videoRefs = useRef<Map<number, HTMLVideoElement | null>>(new Map());
+
+  // Detect Safari browser
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // Safari detection
+      const isSafariBrowser = () => {
+        const ua = navigator.userAgent.toLowerCase();
+        return ua.indexOf('safari') !== -1 && ua.indexOf('chrome') === -1 && ua.indexOf('android') === -1;
+      };
+      
+      setIsSafari(isSafariBrowser());
+    }
+  }, []);
 
   // Detect mobile devices
   useEffect(() => {
@@ -188,43 +210,86 @@ const PortfolioSection = () => {
     }));
   }, []);
 
+  // Function to get absolute URL
+  const getVideoUrl = useCallback((relativePath: string) => {
+    return isClient ? `${baseUrl}${relativePath}` : relativePath;
+  }, [baseUrl, isClient]);
+
+  // Function to get appropriate video URL based on browser
+  const getAppropriateVideoUrl = useCallback((item: PortfolioItem) => {
+    // For Safari browsers, immediately use MP4
+    if (isSafari) {
+      return getVideoUrl(item.mp4VideoSrc);
+    }
+    // For other browsers, use WebM
+    return getVideoUrl(item.videoSrc);
+  }, [isSafari, getVideoUrl]);
+
+  // Create a dedicated video URL for the modal
+  const getModalVideoUrl = useCallback((item: PortfolioItem) => {
+    // Always use MP4 for maximum compatibility
+    return getVideoUrl(item.mp4VideoSrc);
+  }, [getVideoUrl]);
+
   // Handler for mouse enter on portfolio items
   const handleMouseEnter = useCallback((item: PortfolioItem, index: number) => {
     if (!isClient) return;
     
     const videoElement = videoRefs.current.get(item.id);
     if (videoElement) {
+      // If this is the first interaction, set up the video sources
+      if (!interactedItems[item.id]) {
+        // Clear any existing sources
+        while (videoElement.firstChild) {
+          videoElement.removeChild(videoElement.firstChild);
+        }
+        
+        // Add appropriate source based on browser
+        if (isSafari) {
+          // For Safari, only add MP4 source
+          const mp4Source = document.createElement('source');
+          mp4Source.src = getVideoUrl(item.mp4VideoSrc);
+          mp4Source.type = 'video/mp4';
+          videoElement.appendChild(mp4Source);
+        } else {
+          // For other browsers, add both sources with WebM first
+          const webmSource = document.createElement('source');
+          webmSource.src = getVideoUrl(item.videoSrc);
+          webmSource.type = 'video/webm';
+          videoElement.appendChild(webmSource);
+          
+          const mp4Source = document.createElement('source');
+          mp4Source.src = getVideoUrl(item.mp4VideoSrc);
+          mp4Source.type = 'video/mp4';
+          videoElement.appendChild(mp4Source);
+        }
+        
+        // Load the video
+        videoElement.load();
+        
+        // Mark as interacted
+        handleItemInteraction(item.id);
+      }
+      
+      // Play the video (will resume from where it was paused)
       const playVideo = () => {
         videoElement.play().catch(error => {
           console.error(`Video play failed for ${item.title}:`, error);
         });
-        handleItemInteraction(item.id);
       };
       
       setTimeout(playVideo, 100 * (index % 4));
     }
-  }, [isClient, handleItemInteraction]);
+  }, [isClient, handleItemInteraction, getVideoUrl, isSafari, interactedItems]);
 
   // Handler for mouse leave on portfolio items
   const handleMouseLeave = useCallback((itemId: number) => {
     const videoElement = videoRefs.current.get(itemId);
     if (videoElement) {
+      // Pause the video but don't reset it
       videoElement.pause();
     }
   }, []);
-
-  // Memoize categories array
-  const categories = Array.from(new Set(['All', ...portfolioItems.map(item => item.category)])) as Category[];
-  
-  // Memoize filtered items
-  const filteredItems = filter === 'All' 
-    ? portfolioItems 
-    : portfolioItems.filter(item => item.category === filter);
-
-  // Function to get absolute URL
-  const getVideoUrl = useCallback((relativePath: string) => {
-    return isClient ? `${baseUrl}${relativePath}` : relativePath;
-  }, [baseUrl, isClient]);
 
   const handleFilterClick = useCallback((category: Category) => {
     // Pause all videos before changing filter
@@ -235,25 +300,24 @@ const PortfolioSection = () => {
   // Handle video element in modal - needed for proper mobile interaction  
   const modalVideoRef = useRef<HTMLVideoElement>(null);
 
-  // Function to handle modal video playback, especially for mobile
-  const ensureModalVideoPlays = useCallback(() => {
-    if (modalVideoRef.current && selectedItem) {
-      const modalVideo = modalVideoRef.current;
-      
-      // We'll use a much simpler approach: just set the src directly
-      modalVideo.src = getVideoUrl(selectedItem.videoSrc);
-      
-      // Force browser to recognize the change
-      modalVideo.load();
-    }
-  }, [selectedItem, getVideoUrl]);
-
+  // State to track if modal video is playing
+  const [isModalVideoPlaying, setIsModalVideoPlaying] = useState(false);
+  
   // When modal opens, ensure video is set up properly
   useEffect(() => {
     if (modalIsOpen && selectedItem) {
-      ensureModalVideoPlays();
+      // Reset playing state when modal opens
+      setIsModalVideoPlaying(false);
     }
-  }, [modalIsOpen, selectedItem, ensureModalVideoPlays]);
+  }, [modalIsOpen, selectedItem]);
+
+  // Memoize categories array
+  const categories = Array.from(new Set(['All', ...portfolioItems.map(item => item.category)])) as Category[];
+  
+  // Memoize filtered items
+  const filteredItems = filter === 'All' 
+    ? portfolioItems 
+    : portfolioItems.filter(item => item.category === filter);
 
   return (
     <section id="portfolio" className="section-padding">
@@ -330,11 +394,7 @@ const PortfolioSection = () => {
                       playsInline
                       preload="none"
                       onError={(e) => console.error(`Video error for ${item.title}:`, e)}
-                    >
-                      {hasInteracted && (
-                        <source src={getVideoUrl(item.videoSrc)} type="video/webm" />
-                      )}
-                    </video>
+                    />
                   </div>
                 )}
                 
@@ -378,24 +438,42 @@ const PortfolioSection = () => {
             
             {/* Video Section */}
             <div className="relative aspect-video w-full bg-black">
-              {/* Simple video element with direct src */}
-              <video
-                ref={modalVideoRef}
-                className="w-full h-full object-cover"
-                controls
-                playsInline
-                preload="auto"
-                poster={selectedItem.thumbnail}
-              />
+              {/* Video poster (thumbnail) */}
+              {!isModalVideoPlaying && (
+                <div className="absolute inset-0 z-10">
+                  <Image
+                    src={selectedItem.thumbnail}
+                    alt={selectedItem.title}
+                    fill
+                    className="object-cover"
+                    sizes="100vw"
+                    priority
+                  />
+                </div>
+              )}
               
-              {/* Mobile play indicator - purely visual, not interactive */}
-              {isMobile && (
+              {/* Video element - only shown when playing */}
+              {isModalVideoPlaying && (
+                <div className="absolute inset-0 z-20 bg-black">
+                  <video
+                    src={getModalVideoUrl(selectedItem)}
+                    className="w-full h-full object-cover"
+                    controls
+                    autoPlay
+                    playsInline
+                    preload="auto"
+                  />
+                </div>
+              )}
+              
+              {/* Play button overlay - only show when not playing */}
+              {!isModalVideoPlaying && (
                 <div 
-                  className="absolute inset-0 flex items-center justify-center pointer-events-none"
-                  style={{ opacity: 0.6 }}
+                  className="absolute inset-0 z-30 flex items-center justify-center bg-black/30 hover:bg-black/40 transition-colors cursor-pointer"
+                  onClick={() => setIsModalVideoPlaying(true)}
                 >
-                  <div className="bg-[var(--primary)]/70 rounded-full p-5 animate-pulse">
-                    <FiPlay className="w-14 h-14 text-white" />
+                  <div className="bg-[var(--primary)] rounded-full p-6 animate-pulse">
+                    <FiPlay className="w-12 h-12 text-white" />
                   </div>
                 </div>
               )}
