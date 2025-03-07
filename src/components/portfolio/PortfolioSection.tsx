@@ -27,15 +27,14 @@ function ClientOnly({ children, ...delegated }: { children: React.ReactNode } & 
   return <div {...delegated}>{children}</div>;
 }
 
-// Portfolio data with thumbnails only - videos will be loaded only on the client side
+// Updated portfolio data with MP4 paths
 const portfolioItems = [
   {
     id: 1,
     title: "Kasa Kundavi",
     category: "Commercial",
     thumbnail: "/assets/videos/thumbnails/kasakundavi.jpg",
-    videoSrc: "/assets/videos/Portfolio WEBM/Kasa Kundavi.webm",
-    mp4VideoSrc: "/assets/videos/Mp4 Fallback/Portfolio/Kasa Kundavi.mp4",
+    videoSrc: "/assets/videos/Mp4 portfolio/Kasa Kundavi.mp4",
     description: "A captivating commercial that showcases the essence of Kasa Kundavi, blending traditional values with modern storytelling.",
     role: "Director & Cinematographer",
     year: 2023,
@@ -46,8 +45,7 @@ const portfolioItems = [
     title: "Alex Smith",
     category: "Documentary",
     thumbnail: "/assets/videos/thumbnails/hawaii-alex-smith.jpg",
-    videoSrc: "/assets/videos/Portfolio WEBM/alex smith.webm",
-    mp4VideoSrc: "/assets/videos/Mp4 Fallback/Portfolio/alex smith.mp4",
+    videoSrc: "/assets/videos/Mp4 portfolio/alex smith.mp4",
     description: "An intimate documentary portrait capturing the journey and passion of Alex Smith.",
     role: "Director of Photography",
     year: 2023,
@@ -58,8 +56,7 @@ const portfolioItems = [
     title: "Blowup Media",
     category: "Corporate",
     thumbnail: "/assets/videos/thumbnails/blowupmedia.jpg",
-    videoSrc: "/assets/videos/Portfolio WEBM/blowupmedia.webm",
-    mp4VideoSrc: "/assets/videos/Mp4 Fallback/Portfolio/blowupmedia.mp4",
+    videoSrc: "/assets/videos/Mp4 portfolio/blowupmedia.mp4",
     description: "A dynamic corporate video showcasing Blowup Media's innovative approach to digital advertising.",
     role: "Director & Editor",
     year: 2023,
@@ -70,8 +67,7 @@ const portfolioItems = [
     title: "MRGE",
     category: "Commercial",
     thumbnail: "/assets/videos/thumbnails/mrge.jpg",
-    videoSrc: "/assets/videos/Portfolio WEBM/mrge.webm",
-    mp4VideoSrc: "/assets/videos/Mp4 Fallback/Portfolio/mrge.mp4",
+    videoSrc: "/assets/videos/Mp4 portfolio/mrge.mp4",
     description: "A sleek and modern commercial highlighting MRGE's cutting-edge products and services.",
     role: "Cinematographer",
     year: 2023,
@@ -82,8 +78,7 @@ const portfolioItems = [
     title: "MVMT",
     category: "Commercial",
     thumbnail: "/assets/videos/thumbnails/mvmt.jpg",
-    videoSrc: "/assets/videos/Portfolio WEBM/mvmt.webm",
-    mp4VideoSrc: "/assets/videos/Mp4 Fallback/Portfolio/mvmt.mp4",
+    videoSrc: "/assets/videos/Mp4 portfolio/mvmt.mp4",
     description: "A stylish commercial for MVMT watches, capturing the essence of modern lifestyle and fashion.",
     role: "Director & Cinematographer",
     year: 2023,
@@ -94,8 +89,7 @@ const portfolioItems = [
     title: "Radio 912",
     category: "Commercial",
     thumbnail: "/assets/videos/thumbnails/radio912.jpg",
-    videoSrc: "/assets/videos/Portfolio WEBM/radio912.webm",
-    mp4VideoSrc: "/assets/videos/Mp4 Fallback/Portfolio/radio912.mp4",
+    videoSrc: "/assets/videos/Mp4 portfolio/radio912.mp4",
     description: "An energetic commercial for Radio 912, bringing sound and visuals together in perfect harmony.",
     role: "Director",
     year: 2023,
@@ -106,8 +100,7 @@ const portfolioItems = [
     title: "SL",
     category: "Commercial",
     thumbnail: "/assets/videos/thumbnails/sl.jpg",
-    videoSrc: "/assets/videos/Portfolio WEBM/sl.webm",
-    mp4VideoSrc: "/assets/videos/Mp4 Fallback/Portfolio/sl.mp4",
+    videoSrc: "/assets/videos/Mp4 portfolio/sl.mp4",
     description: "A compelling commercial that tells the story of SL through sophisticated cinematography.",
     role: "Director of Photography",
     year: 2023,
@@ -118,8 +111,7 @@ const portfolioItems = [
     title: "Vinature",
     category: "Commercial",
     thumbnail: "/assets/videos/thumbnails/vinature.jpg",
-    videoSrc: "/assets/videos/Portfolio WEBM/vinature.webm",
-    mp4VideoSrc: "/assets/videos/Mp4 Fallback/Portfolio/vinature.mp4",
+    videoSrc: "/assets/videos/Mp4 portfolio/vinature.mp4",
     description: "An artistic commercial for Vinature, celebrating the beauty of natural wine and sustainable practices.",
     role: "Director & Cinematographer",
     year: 2023,
@@ -139,23 +131,14 @@ const PortfolioSection = () => {
   const [isClient, setIsClient] = useState(false);
   const [baseUrl, setBaseUrl] = useState('');
   const [isMobile, setIsMobile] = useState(false);
-  const [isSafari, setIsSafari] = useState(false);
+  const [isModalVideoPlaying, setIsModalVideoPlaying] = useState(false);
+  const [isModalVideoLoading, setIsModalVideoLoading] = useState(false);
+  const [modalVideoError, setModalVideoError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
   
   // Create a map of video refs outside the render loop
   const videoRefs = useRef<Map<number, HTMLVideoElement | null>>(new Map());
-
-  // Detect Safari browser
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      // Safari detection
-      const isSafariBrowser = () => {
-        const ua = navigator.userAgent.toLowerCase();
-        return ua.indexOf('safari') !== -1 && ua.indexOf('chrome') === -1 && ua.indexOf('android') === -1;
-      };
-      
-      setIsSafari(isSafariBrowser());
-    }
-  }, []);
+  const modalVideoRef = useRef<HTMLVideoElement>(null);
 
   // Detect mobile devices
   useEffect(() => {
@@ -180,6 +163,14 @@ const PortfolioSection = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Set isClient true once mounted
+  useEffect(() => {
+    setIsClient(true);
+    if (typeof window !== 'undefined') {
+      setBaseUrl(window.location.origin);
+    }
+  }, []);
+
   // Cleanup function for videos
   const cleanupVideos = useCallback(() => {
     videoRefs.current.forEach((video) => {
@@ -191,13 +182,8 @@ const PortfolioSection = () => {
     });
   }, []);
 
+  // Cleanup on unmount
   useEffect(() => {
-    setIsClient(true);
-    if (typeof window !== 'undefined') {
-      setBaseUrl(window.location.origin);
-    }
-
-    // Cleanup videos when component unmounts
     return () => {
       cleanupVideos();
     };
@@ -209,6 +195,7 @@ const PortfolioSection = () => {
     cleanupVideos();
   }, [filter, cleanupVideos]);
 
+  // Modal handlers
   const openModal = useCallback((item: PortfolioItem) => {
     setSelectedItem(item);
     setModalIsOpen(true);
@@ -226,42 +213,23 @@ const PortfolioSection = () => {
     }));
   }, []);
 
-  // Function to get absolute URL with proper handling for production
+  // Function to get absolute URL
   const getVideoUrl = useCallback((relativePath: string) => {
-    // If it's an absolute URL (starts with http or https), return as is
+    // If it's an absolute URL, return as is
     if (relativePath.startsWith('http')) {
       return relativePath;
     }
     
-    // For production environment (deployed site)
+    // For production environment, use relative paths
     if (process.env.NODE_ENV === 'production') {
-      // Use relative paths on production to avoid CORS issues
-      // Remove leading slash if present
-      return relativePath.startsWith('/') ? relativePath.slice(1) : relativePath;
+      // Remove leading slash if present and encode spaces
+      const path = relativePath.startsWith('/') ? relativePath.slice(1) : relativePath;
+      return path.replace(/ /g, '%20');
     }
     
     // For development environment
     return isClient ? `${baseUrl}${relativePath}` : relativePath;
   }, [baseUrl, isClient]);
-
-  // Function to get appropriate video URL based on browser
-  const getAppropriateVideoUrl = useCallback((item: PortfolioItem) => {
-    // For Safari browsers, immediately use MP4
-    if (isSafari) {
-      return getVideoUrl(item.mp4VideoSrc);
-    }
-    // For other browsers, use WebM
-    return getVideoUrl(item.videoSrc);
-  }, [isSafari, getVideoUrl]);
-
-  // Create a dedicated video URL for the modal
-  const getModalVideoUrl = useCallback((item: PortfolioItem) => {
-    // Always use MP4 for Safari in production for maximum compatibility
-    const videoPath = isSafari ? item.mp4VideoSrc : item.videoSrc;
-    const url = getVideoUrl(videoPath);
-    console.log(`Modal video URL: ${url} (Safari: ${isSafari}, Env: ${process.env.NODE_ENV})`);
-    return url;
-  }, [getVideoUrl, isSafari]);
 
   // Handler for mouse enter on portfolio items
   const handleMouseEnter = useCallback((item: PortfolioItem, index: number) => {
@@ -276,25 +244,8 @@ const PortfolioSection = () => {
           videoElement.removeChild(videoElement.firstChild);
         }
         
-        // Add appropriate source based on browser
-        if (isSafari) {
-          // For Safari, only add MP4 source
-          const mp4Source = document.createElement('source');
-          mp4Source.src = getVideoUrl(item.mp4VideoSrc);
-          mp4Source.type = 'video/mp4';
-          videoElement.appendChild(mp4Source);
-        } else {
-          // For other browsers, add both sources with WebM first
-          const webmSource = document.createElement('source');
-          webmSource.src = getVideoUrl(item.videoSrc);
-          webmSource.type = 'video/webm';
-          videoElement.appendChild(webmSource);
-          
-          const mp4Source = document.createElement('source');
-          mp4Source.src = getVideoUrl(item.mp4VideoSrc);
-          mp4Source.type = 'video/mp4';
-          videoElement.appendChild(mp4Source);
-        }
+        // Set video source
+        videoElement.src = getVideoUrl(item.videoSrc);
         
         // Load the video
         videoElement.load();
@@ -312,7 +263,7 @@ const PortfolioSection = () => {
       
       setTimeout(playVideo, 100 * (index % 4));
     }
-  }, [isClient, handleItemInteraction, getVideoUrl, isSafari, interactedItems]);
+  }, [isClient, handleItemInteraction, getVideoUrl, interactedItems]);
 
   // Handler for mouse leave on portfolio items
   const handleMouseLeave = useCallback((itemId: number) => {
@@ -322,23 +273,6 @@ const PortfolioSection = () => {
       videoElement.pause();
     }
   }, []);
-
-  const handleFilterClick = useCallback((category: Category) => {
-    // Pause all videos before changing filter
-    cleanupVideos();
-    setFilter(category);
-  }, [cleanupVideos]);
-
-  // Handle video element in modal - needed for proper mobile interaction  
-  const modalVideoRef = useRef<HTMLVideoElement>(null);
-
-  // State to track if modal video is playing
-  const [isModalVideoPlaying, setIsModalVideoPlaying] = useState(false);
-  
-  // Add loading state
-  const [isModalVideoLoading, setIsModalVideoLoading] = useState(false);
-  const [modalVideoError, setModalVideoError] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
 
   // Reset states when modal opens/closes
   useEffect(() => {
@@ -350,19 +284,6 @@ const PortfolioSection = () => {
     }
   }, [modalIsOpen, selectedItem]);
 
-  // Debug: Log video sources when modal opens
-  useEffect(() => {
-    if (modalIsOpen && selectedItem && isClient) {
-      console.log('Video sources available:', {
-        mp4: getVideoUrl(selectedItem.mp4VideoSrc),
-        webm: getVideoUrl(selectedItem.videoSrc),
-        isSafari,
-        isMobile,
-        environment: process.env.NODE_ENV
-      });
-    }
-  }, [modalIsOpen, selectedItem, getVideoUrl, isSafari, isMobile, isClient]);
-
   // Memoize categories array
   const categories = Array.from(new Set(['All', ...portfolioItems.map(item => item.category)])) as Category[];
   
@@ -371,14 +292,11 @@ const PortfolioSection = () => {
     ? portfolioItems 
     : portfolioItems.filter(item => item.category === filter);
 
-  // Simple direct URL function for production video links
-  const getProductionVideoUrl = useCallback((item: PortfolioItem) => {
-    if (isSafari) {
-      // Ensure valid URL encoding for special characters in filenames
-      return item.mp4VideoSrc.replace(/ /g, '%20');
-    }
-    return item.videoSrc.replace(/ /g, '%20');
-  }, [isSafari]);
+  const handleFilterClick = useCallback((category: Category) => {
+    // Pause all videos before changing filter
+    cleanupVideos();
+    setFilter(category);
+  }, [cleanupVideos]);
 
   return (
     <section id="portfolio" className="section-padding">
@@ -517,66 +435,34 @@ const PortfolioSection = () => {
                 {/* Video element - only shown when playing */}
                 {isModalVideoPlaying && (
                   <div className="absolute inset-0 z-20 bg-black">
-                    {process.env.NODE_ENV === 'production' ? (
-                      // Use a simpler video approach in production
-                      <video
-                        key={`${selectedItem.id}-${retryCount}`}
-                        className="w-full h-full object-cover"
-                        controls
-                        autoPlay
-                        playsInline
-                        poster={selectedItem.thumbnail}
-                        src={getProductionVideoUrl(selectedItem)}
-                        onError={(e) => {
-                          console.error('Modal video error:', e);
-                          setModalVideoError(true);
-                          setIsModalVideoLoading(false);
-                          setIsModalVideoPlaying(false);
-                        }}
-                        onCanPlay={() => {
-                          setIsModalVideoLoading(false);
-                          setModalVideoError(false);
-                        }}
-                        onPlaying={() => {
-                          setIsModalVideoLoading(false);
-                          setModalVideoError(false);
-                        }}
-                      />
-                    ) : (
-                      // Development version with more debugging
-                      <video
-                        key={`${selectedItem.id}-${retryCount}`}
-                        className="w-full h-full object-cover"
-                        controls
-                        autoPlay
-                        playsInline
-                        poster={selectedItem.thumbnail}
-                        onLoadStart={() => setIsModalVideoLoading(true)}
-                        onCanPlay={() => setIsModalVideoLoading(false)}
-                        onError={(e) => {
-                          console.error('Modal video error:', e);
-                          setModalVideoError(true);
-                          setIsModalVideoLoading(false);
-                          setIsModalVideoPlaying(false);
-                        }}
-                        onPlaying={() => {
-                          setIsModalVideoLoading(false);
-                          setModalVideoError(false);
-                        }}
-                      >
-                        <source 
-                          src={getVideoUrl(selectedItem.mp4VideoSrc)} 
-                          type="video/mp4"
-                        />
-                        {!isSafari && (
-                          <source 
-                            src={getVideoUrl(selectedItem.videoSrc)} 
-                            type="video/webm"
-                          />
-                        )}
-                        Your browser does not support HTML video.
-                      </video>
-                    )}
+                    <video
+                      key={`${selectedItem.id}-${retryCount}`}
+                      className="w-full h-full object-cover"
+                      controls
+                      autoPlay
+                      playsInline
+                      preload="auto"
+                      poster={selectedItem.thumbnail}
+                      src={getVideoUrl(selectedItem.videoSrc)}
+                      onLoadStart={() => {
+                        setIsModalVideoLoading(true);
+                        console.log('Video load started');
+                      }}
+                      onCanPlay={() => {
+                        setIsModalVideoLoading(false);
+                        console.log('Video can play');
+                      }}
+                      onError={(e) => {
+                        console.error('Modal video error:', e);
+                        setModalVideoError(true);
+                        setIsModalVideoLoading(false);
+                        setIsModalVideoPlaying(false);
+                      }}
+                      onPlaying={() => {
+                        setIsModalVideoLoading(false);
+                        setModalVideoError(false);
+                      }}
+                    />
                   </div>
                 )}
 
@@ -656,5 +542,4 @@ const PortfolioSection = () => {
   );
 };
 
-// Export as client-only component to avoid hydration issues
 export default PortfolioSection; 

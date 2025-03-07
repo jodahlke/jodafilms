@@ -27,7 +27,6 @@ export default function VideoBackground({ fallbackImageUrl }: VideoBackgroundPro
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [videoLoading, setVideoLoading] = useState(true);
-  const [isSafari, setIsSafari] = useState(false);
   const [videoError, setVideoError] = useState(false);
   const [hasMounted, setHasMounted] = useState(false);
   
@@ -36,7 +35,7 @@ export default function VideoBackground({ fallbackImageUrl }: VideoBackgroundPro
     setHasMounted(true);
   }, []);
   
-  // Browser detection
+  // Mobile detection
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
@@ -44,13 +43,7 @@ export default function VideoBackground({ fallbackImageUrl }: VideoBackgroundPro
       return window.innerWidth < 768 || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     };
     
-    const detectSafari = () => {
-      const ua = navigator.userAgent.toLowerCase();
-      return ua.indexOf('safari') !== -1 && ua.indexOf('chrome') === -1;
-    };
-    
     setIsMobile(detectMobile());
-    setIsSafari(detectSafari());
     
     const handleResize = () => {
       setIsMobile(detectMobile());
@@ -90,33 +83,11 @@ export default function VideoBackground({ fallbackImageUrl }: VideoBackgroundPro
     setVideoError(false);
     setVideoLoading(true);
     
-    // In production, use a simpler approach
-    if (process.env.NODE_ENV === 'production') {
-      // Set video source directly
-      video.src = isSafari 
-        ? getVideoUrl('/assets/videos/Mp4 Fallback/hero-video.mp4')
-        : getVideoUrl('/assets/videos/hero/hero-video.webm');
-    } else {
-      // In development, use source elements
-      // Clear existing sources
-      while (video.firstChild) {
-        video.removeChild(video.firstChild);
-      }
-      
-      // Add MP4 source (always first for maximum compatibility)
-      const mp4Source = document.createElement('source');
-      mp4Source.src = getVideoUrl('/assets/videos/Mp4 Fallback/hero-video.mp4');
-      mp4Source.type = 'video/mp4';
-      video.appendChild(mp4Source);
-      
-      // Add WebM source if not Safari
-      if (!isSafari) {
-        const webmSource = document.createElement('source');
-        webmSource.src = getVideoUrl('/assets/videos/hero/hero-video.webm');
-        webmSource.type = 'video/webm';
-        video.appendChild(webmSource);
-      }
-    }
+    // Set the video source directly
+    const videoPath = '/assets/videos/hero/hero-video.mp4';
+    video.src = getVideoUrl(videoPath);
+    
+    console.log('Hero video path:', getVideoUrl(videoPath));
     
     const handleCanPlay = () => {
       setVideoLoading(false);
@@ -160,7 +131,7 @@ export default function VideoBackground({ fallbackImageUrl }: VideoBackgroundPro
       video.removeEventListener('pause', handlePause);
       video.removeEventListener('error', handleError);
     };
-  }, [isSafari, isMobile, hasMounted]);
+  }, [isMobile, hasMounted]);
   
   // Play button handler
   const handlePlayClick = () => {
