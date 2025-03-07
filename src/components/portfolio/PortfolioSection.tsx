@@ -212,6 +212,18 @@ const PortfolioSection = () => {
 
   // Function to get absolute URL
   const getVideoUrl = useCallback((relativePath: string) => {
+    // If it's an absolute URL (starts with http or https), return as is
+    if (relativePath.startsWith('http')) {
+      return relativePath;
+    }
+    
+    // For deployed environment, use relative paths
+    if (process.env.NODE_ENV === 'production') {
+      // Remove leading slash if present to make path relative
+      return relativePath.startsWith('/') ? relativePath.slice(1) : relativePath;
+    }
+    
+    // For development, use full URL
     return isClient ? `${baseUrl}${relativePath}` : relativePath;
   }, [baseUrl, isClient]);
 
@@ -303,13 +315,30 @@ const PortfolioSection = () => {
   // State to track if modal video is playing
   const [isModalVideoPlaying, setIsModalVideoPlaying] = useState(false);
   
-  // When modal opens, ensure video is set up properly
+  // Add loading state
+  const [isModalVideoLoading, setIsModalVideoLoading] = useState(false);
+  const [modalVideoError, setModalVideoError] = useState(false);
+
+  // Reset states when modal opens/closes
   useEffect(() => {
     if (modalIsOpen && selectedItem) {
-      // Reset playing state when modal opens
       setIsModalVideoPlaying(false);
+      setModalVideoError(false);
+      setIsModalVideoLoading(false);
     }
   }, [modalIsOpen, selectedItem]);
+
+  // Add debug logging for video sources
+  useEffect(() => {
+    if (selectedItem) {
+      console.log('Video sources:', {
+        mp4: getVideoUrl(selectedItem.mp4VideoSrc),
+        webm: getVideoUrl(selectedItem.videoSrc),
+        environment: process.env.NODE_ENV,
+        baseUrl
+      });
+    }
+  }, [selectedItem, getVideoUrl, baseUrl]);
 
   // Memoize categories array
   const categories = Array.from(new Set(['All', ...portfolioItems.map(item => item.category)])) as Category[];
@@ -456,24 +485,79 @@ const PortfolioSection = () => {
               {isModalVideoPlaying && (
                 <div className="absolute inset-0 z-20 bg-black">
                   <video
+                    key={selectedItem.id}
                     src={getModalVideoUrl(selectedItem)}
                     className="w-full h-full object-cover"
                     controls
                     autoPlay
                     playsInline
                     preload="auto"
+                    onLoadStart={() => {
+                      setIsModalVideoLoading(true);
+                      console.log('Video load started');
+                    }}
+                    onLoadedData={() => {
+                      setIsModalVideoLoading(false);
+                      console.log('Video data loaded');
+                    }}
+                    onError={(e) => {
+                      const video = e.currentTarget;
+                      console.error('Modal video error:', {
+                        event: e,
+                        currentSrc: video.currentSrc,
+                        readyState: video.readyState,
+                        networkState: video.networkState,
+                        errorMessage: video.error?.message
+                      });
+                      setModalVideoError(true);
+                      setIsModalVideoLoading(false);
+                      setIsModalVideoPlaying(false);
+                    }}
+                    onPlaying={() => {
+                      console.log('Modal video playing');
+                      setIsModalVideoLoading(false);
+                      setModalVideoError(false);
+                    }}
                   />
                 </div>
               )}
-              
-              {/* Play button overlay - only show when not playing */}
-              {!isModalVideoPlaying && (
+
+              {/* Loading spinner */}
+              {isModalVideoLoading && (
+                <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/50">
+                  <div className="w-12 h-12 border-4 border-[var(--primary)] border-t-transparent rounded-full animate-spin"></div>
+                </div>
+              )}
+
+              {/* Play button overlay - only show when not playing and not loading */}
+              {!isModalVideoPlaying && !modalVideoError && !isModalVideoLoading && (
                 <div 
                   className="absolute inset-0 z-30 flex items-center justify-center bg-black/30 hover:bg-black/40 transition-colors cursor-pointer"
-                  onClick={() => setIsModalVideoPlaying(true)}
+                  onClick={() => {
+                    console.log('Play button clicked');
+                    setIsModalVideoPlaying(true);
+                  }}
                 >
                   <div className="bg-[var(--primary)] rounded-full p-6 animate-pulse">
                     <FiPlay className="w-12 h-12 text-white" />
+                  </div>
+                </div>
+              )}
+
+              {/* Error message */}
+              {modalVideoError && (
+                <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/80">
+                  <div className="text-center p-6">
+                    <p className="text-white text-lg mb-4">Video playback error</p>
+                    <button
+                      onClick={() => {
+                        setModalVideoError(false);
+                        setIsModalVideoPlaying(true);
+                      }}
+                      className="bg-[var(--primary)] text-white px-6 py-3 rounded-md hover:bg-opacity-80 transition-colors"
+                    >
+                      Try Again
+                    </button>
                   </div>
                 </div>
               )}
