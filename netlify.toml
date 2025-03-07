@@ -4,7 +4,7 @@
   command = "npm run build"
   publish = "out"
 
-# Handle CORS and proper headers for MP4 files
+# Handle CORS and proper headers for MP4 files - general pattern
 [[headers]]
   for = "*/assets/videos/**/*.mp4"
   [headers.values]
@@ -22,9 +22,9 @@
     Content-Disposition = "inline"
     Cache-Control = "public, max-age=31536000"
 
-# More specific header for portfolio videos
+# Portfolio videos with correct path
 [[headers]]
-  for = "*/assets/videos/Mp4 portfolio/*"
+  for = "*/assets/videos/Mp4 portfolio/Portfolio/*.mp4"
   [headers.values]
     Access-Control-Allow-Origin = "*"
     Content-Type = "video/mp4"
@@ -33,7 +33,7 @@
 
 # Header for hero video
 [[headers]]
-  for = "*/assets/videos/hero/*"
+  for = "*/assets/videos/hero/*.mp4"
   [headers.values]
     Access-Control-Allow-Origin = "*"
     Content-Type = "video/mp4"
