@@ -208,6 +208,55 @@ const PortfolioSection = () => {
     setFilter(category);
   }, [cleanupVideos]);
 
+  // Handle video element in modal - needed for proper mobile interaction  
+  const modalVideoRef = useRef<HTMLVideoElement>(null);
+
+  // Function to handle modal video playback, especially for mobile
+  const ensureModalVideoPlays = useCallback(() => {
+    if (modalVideoRef.current && selectedItem) {
+      const modalVideo = modalVideoRef.current;
+      
+      // Set the src properly
+      const videoSource = getVideoUrl(selectedItem.videoSrc);
+      
+      // Create a new source element
+      const source = document.createElement('source');
+      source.src = videoSource;
+      source.type = 'video/webm';
+      
+      // Remove existing sources
+      while (modalVideo.firstChild) {
+        modalVideo.removeChild(modalVideo.firstChild);
+      }
+      
+      // Add the new source
+      modalVideo.appendChild(source);
+      
+      // Load and play - this handle works better for mobile
+      modalVideo.load();
+      
+      // Use a small timeout to ensure DOM updates have processed
+      setTimeout(() => {
+        const playPromise = modalVideo.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(error => {
+            console.error('Modal video play error:', error);
+            
+            // On mobile, we might need user interaction
+            // The video controls will be visible so the user can tap play
+          });
+        }
+      }, 100);
+    }
+  }, [selectedItem, getVideoUrl]);
+
+  // When modal opens, ensure video plays
+  useEffect(() => {
+    if (modalIsOpen && selectedItem) {
+      ensureModalVideoPlays();
+    }
+  }, [modalIsOpen, selectedItem, ensureModalVideoPlays]);
+
   return (
     <section id="portfolio" className="section-padding">
       <div className="px-4 sm:px-8 lg:px-12">
@@ -332,11 +381,15 @@ const PortfolioSection = () => {
             {/* Video Section */}
             <div className="relative aspect-video w-full bg-[var(--secondary)]">
               <video
+                ref={modalVideoRef}
                 className="w-full h-full object-cover"
                 controls
-                autoPlay
+                controlsList="nodownload"
                 playsInline
+                autoPlay={false} /* We'll handle this manually */
+                preload="auto"
               >
+                {/* Sources will be added programmatically */}
                 <source src={getVideoUrl(selectedItem.videoSrc)} type="video/webm" />
                 Your browser does not support the video tag.
               </video>
