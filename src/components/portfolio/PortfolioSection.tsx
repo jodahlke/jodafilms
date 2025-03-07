@@ -101,51 +101,87 @@ const portfolioItems = [
     year: 2023,
     client: "Vinature",
   },
-];
+] as const;
+
+// Define the type based on the array elements
+type PortfolioItem = (typeof portfolioItems)[number];
+type Category = PortfolioItem['category'] | 'All';
 
 const PortfolioSection = () => {
   const [modalIsOpen, setModalIsOpen] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<typeof portfolioItems[0] | null>(null);
-  const [filter, setFilter] = useState("All");
+  const [selectedItem, setSelectedItem] = useState<PortfolioItem | null>(null);
+  const [filter, setFilter] = useState<Category>('All');
   const [interactedItems, setInteractedItems] = useState<{[key: number]: boolean}>({});
   const [isClient, setIsClient] = useState(false);
   const [baseUrl, setBaseUrl] = useState('');
+  
+  // Create a map of video refs outside the render loop
+  const videoRefs = useRef<Map<number, HTMLVideoElement | null>>(new Map());
+
+  // Cleanup function for videos
+  const cleanupVideos = useCallback(() => {
+    videoRefs.current.forEach((video) => {
+      if (video) {
+        video.pause();
+        video.removeAttribute('src');
+        video.load();
+      }
+    });
+  }, []);
 
   useEffect(() => {
-    // Mark that we're on the client side
     setIsClient(true);
-    // Set base URL for assets
     if (typeof window !== 'undefined') {
       setBaseUrl(window.location.origin);
     }
-  }, []);
 
-  const openModal = (item: typeof portfolioItems[0]) => {
+    // Cleanup videos when component unmounts
+    return () => {
+      cleanupVideos();
+    };
+  }, [cleanupVideos]);
+
+  // Reset video states when filter changes
+  useEffect(() => {
+    setInteractedItems({});
+    cleanupVideos();
+  }, [filter, cleanupVideos]);
+
+  const openModal = useCallback((item: PortfolioItem) => {
     setSelectedItem(item);
     setModalIsOpen(true);
-  };
+  }, []);
 
-  const closeModal = () => {
+  const closeModal = useCallback(() => {
     setModalIsOpen(false);
-  };
+    setTimeout(() => setSelectedItem(null), 300); // Clear after animation
+  }, []);
 
-  const handleItemInteraction = (itemId: number) => {
+  const handleItemInteraction = useCallback((itemId: number) => {
     setInteractedItems(prev => ({
       ...prev,
       [itemId]: true
     }));
-  };
+  }, []);
 
-  const categories = ["All", ...new Set(portfolioItems.map(item => item.category))];
+  // Memoize categories array
+  const categories = Array.from(new Set(['All', ...portfolioItems.map(item => item.category)])) as Category[];
   
-  const filteredItems = filter === "All" 
+  // Memoize filtered items
+  const filteredItems = filter === 'All' 
     ? portfolioItems 
     : portfolioItems.filter(item => item.category === filter);
 
   // Function to get absolute URL
-  const getVideoUrl = (relativePath: string) => {
+  const getVideoUrl = useCallback((relativePath: string) => {
     return isClient ? `${baseUrl}${relativePath}` : relativePath;
-  };
+  }, [baseUrl, isClient]);
+
+  const handleFilterClick = useCallback((category: Category) => {
+    // Pause all videos before changing filter
+    cleanupVideos();
+    setFilter(category);
+  }, [cleanupVideos]);
 
   return (
     <section id="portfolio" className="section-padding">
@@ -166,7 +202,7 @@ const PortfolioSection = () => {
             {categories.map(category => (
               <button
                 key={category}
-                onClick={() => setFilter(category)}
+                onClick={() => handleFilterClick(category)}
                 className={`px-8 py-3 rounded-md transition-all text-lg ${
                   filter === category 
                     ? "bg-[var(--primary)] text-white" 
@@ -182,32 +218,30 @@ const PortfolioSection = () => {
         {/* Portfolio Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 max-w-[2400px] mx-auto">
           {filteredItems.map((item, index) => {
-            const videoRef = useRef<HTMLVideoElement>(null);
             const hasInteracted = interactedItems[item.id] || false;
 
             const handleMouseEnter = useCallback(() => {
-              // Only run video loading logic on the client
               if (!isClient) return;
               
-              if (videoRef.current) {
-                // Only start playing videos when they're visible and after a short delay
+              const videoElement = videoRefs.current.get(item.id);
+              if (videoElement) {
                 const playVideo = () => {
-                  videoRef.current?.play().catch(error => {
-                    console.error("Video play failed:", error);
+                  videoElement.play().catch(error => {
+                    console.error(`Video play failed for ${item.title}:`, error);
                   });
                   handleItemInteraction(item.id);
                 };
                 
-                // Add a small delay to prevent too many videos loading at once
                 setTimeout(playVideo, 100 * (index % 4));
               }
-            }, [item.id, index, isClient]);
+            }, [item.id, item.title, index]);
 
             const handleMouseLeave = useCallback(() => {
-              if (videoRef.current) {
-                videoRef.current.pause();
+              const videoElement = videoRefs.current.get(item.id);
+              if (videoElement) {
+                videoElement.pause();
               }
-            }, []);
+            }, [item.id]);
 
             return (
               <motion.div
@@ -221,7 +255,7 @@ const PortfolioSection = () => {
                 onMouseEnter={handleMouseEnter}
                 onMouseLeave={handleMouseLeave}
               >
-                {/* Thumbnail - Always show during SSR/build and before interaction */}
+                {/* Thumbnail */}
                 <div className={`absolute inset-0 z-10 transition-opacity duration-300 ${hasInteracted && isClient ? 'opacity-0' : 'opacity-100'}`}>
                   <Image
                     src={item.thumbnail}
@@ -235,11 +269,13 @@ const PortfolioSection = () => {
                   />
                 </div>
 
-                {/* Preview Video - Only render on client side */}
+                {/* Preview Video */}
                 {isClient && (
                   <div className={`absolute inset-0 z-20 transition-opacity duration-300 ${hasInteracted ? 'opacity-100' : 'opacity-0'}`}>
                     <video
-                      ref={videoRef}
+                      ref={el => {
+                        if (el) videoRefs.current.set(item.id, el);
+                      }}
                       className="w-full h-full object-cover"
                       muted
                       playsInline
