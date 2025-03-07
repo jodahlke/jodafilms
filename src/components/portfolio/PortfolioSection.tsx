@@ -5,10 +5,26 @@ import { motion } from "framer-motion";
 import Modal from "react-modal";
 import { FiX, FiExternalLink, FiVideo, FiPlay } from "react-icons/fi";
 import Image from "next/image";
+import dynamic from 'next/dynamic';
 
-// Bind modal to document element
+// Ensure Modal is only initialized on the client side
 if (typeof window !== "undefined") {
   Modal.setAppElement("body");
+}
+
+// Create a client-only wrapper to handle hydration issues
+function ClientOnly({ children, ...delegated }: { children: React.ReactNode } & any) {
+  const [hasMounted, setHasMounted] = useState(false);
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
+  if (!hasMounted) {
+    return null;
+  }
+
+  return <div {...delegated}>{children}</div>;
 }
 
 // Portfolio data with thumbnails only - videos will be loaded only on the client side
@@ -355,6 +371,15 @@ const PortfolioSection = () => {
     ? portfolioItems 
     : portfolioItems.filter(item => item.category === filter);
 
+  // Simple direct URL function for production video links
+  const getProductionVideoUrl = useCallback((item: PortfolioItem) => {
+    if (isSafari) {
+      // Ensure valid URL encoding for special characters in filenames
+      return item.mp4VideoSrc.replace(/ /g, '%20');
+    }
+    return item.videoSrc.replace(/ /g, '%20');
+  }, [isSafari]);
+
   return (
     <section id="portfolio" className="section-padding">
       <div className="px-4 sm:px-8 lg:px-12">
@@ -452,176 +477,184 @@ const PortfolioSection = () => {
         </div>
       </div>
 
-      {/* Project Modal */}
-      <Modal
-        isOpen={modalIsOpen}
-        onRequestClose={closeModal}
-        className="modal-content w-[95vw] max-w-[2000px] p-0 outline-none mx-auto"
-        overlayClassName="modal-overlay"
-        contentLabel={`Project details for ${selectedItem?.title || 'Selected project'}`}
-        shouldReturnFocusAfterClose={true}
-        closeTimeoutMS={300}
-      >
-        {selectedItem && (
-          <div className="p-0 md:p-4 lg:p-8 relative">
-            <button
-              onClick={closeModal}
-              className="absolute top-4 right-4 z-10 bg-black/50 rounded-full p-2 text-white hover:bg-black/80 transition-colors"
-              aria-label="Close modal"
-            >
-              <FiX className="w-6 h-6" />
-            </button>
-            
-            {/* Video Section */}
-            <div className="relative aspect-video w-full bg-black">
-              {/* Video poster (thumbnail) */}
-              {!isModalVideoPlaying && (
-                <div className="absolute inset-0 z-10">
-                  <Image
-                    src={selectedItem.thumbnail}
-                    alt={selectedItem.title}
-                    fill
-                    className="object-cover"
-                    sizes="100vw"
-                    priority
-                  />
-                </div>
-              )}
+      {/* Use ClientOnly for Modal to prevent hydration issues */}
+      {isClient && (
+        <Modal
+          isOpen={modalIsOpen}
+          onRequestClose={closeModal}
+          className="modal-content w-[95vw] max-w-[2000px] p-0 outline-none mx-auto"
+          overlayClassName="modal-overlay"
+          contentLabel={`Project details for ${selectedItem?.title || 'Selected project'}`}
+          shouldReturnFocusAfterClose={true}
+          closeTimeoutMS={300}
+        >
+          {selectedItem && (
+            <div className="p-0 md:p-4 lg:p-8 relative" suppressHydrationWarning>
+              <button
+                onClick={closeModal}
+                className="absolute top-4 right-4 z-10 bg-black/50 rounded-full p-2 text-white hover:bg-black/80 transition-colors"
+                aria-label="Close modal"
+              >
+                <FiX className="w-6 h-6" />
+              </button>
               
-              {/* Video element - only shown when playing */}
-              {isModalVideoPlaying && (
-                <div className="absolute inset-0 z-20 bg-black">
-                  <video
-                    key={`${selectedItem.id}-${retryCount}`}
-                    className="w-full h-full object-cover"
-                    controls
-                    autoPlay
-                    playsInline
-                    preload="auto"
-                    poster={selectedItem.thumbnail}
-                    onLoadStart={() => {
-                      setIsModalVideoLoading(true);
-                      console.log('Video load started');
-                    }}
-                    onLoadedMetadata={() => {
-                      console.log('Video metadata loaded');
-                    }}
-                    onLoadedData={() => {
-                      setIsModalVideoLoading(false);
-                      console.log('Video data loaded successfully');
-                    }}
-                    onCanPlay={() => {
-                      console.log('Video can play');
-                      setIsModalVideoLoading(false);
-                    }}
-                    onError={(e) => {
-                      const video = e.currentTarget;
-                      console.error('Modal video error:', {
-                        event: e,
-                        currentSrc: video.currentSrc,
-                        readyState: video.readyState,
-                        networkState: video.networkState,
-                        errorMessage: video.error?.message
-                      });
-                      setModalVideoError(true);
-                      setIsModalVideoLoading(false);
-                      setIsModalVideoPlaying(false);
-                    }}
-                    onPlaying={() => {
-                      console.log('Modal video playing');
-                      setIsModalVideoLoading(false);
-                      setModalVideoError(false);
+              {/* Video Section */}
+              <ClientOnly className="relative aspect-video w-full bg-black">
+                {/* Video poster (thumbnail) */}
+                {!isModalVideoPlaying && (
+                  <div className="absolute inset-0 z-10">
+                    <Image
+                      src={selectedItem.thumbnail}
+                      alt={selectedItem.title}
+                      fill
+                      className="object-cover"
+                      sizes="100vw"
+                      priority
+                    />
+                  </div>
+                )}
+                
+                {/* Video element - only shown when playing */}
+                {isModalVideoPlaying && (
+                  <div className="absolute inset-0 z-20 bg-black">
+                    {process.env.NODE_ENV === 'production' ? (
+                      // Use a simpler video approach in production
+                      <video
+                        key={`${selectedItem.id}-${retryCount}`}
+                        className="w-full h-full object-cover"
+                        controls
+                        autoPlay
+                        playsInline
+                        poster={selectedItem.thumbnail}
+                        src={getProductionVideoUrl(selectedItem)}
+                        onError={(e) => {
+                          console.error('Modal video error:', e);
+                          setModalVideoError(true);
+                          setIsModalVideoLoading(false);
+                          setIsModalVideoPlaying(false);
+                        }}
+                        onCanPlay={() => {
+                          setIsModalVideoLoading(false);
+                          setModalVideoError(false);
+                        }}
+                        onPlaying={() => {
+                          setIsModalVideoLoading(false);
+                          setModalVideoError(false);
+                        }}
+                      />
+                    ) : (
+                      // Development version with more debugging
+                      <video
+                        key={`${selectedItem.id}-${retryCount}`}
+                        className="w-full h-full object-cover"
+                        controls
+                        autoPlay
+                        playsInline
+                        poster={selectedItem.thumbnail}
+                        onLoadStart={() => setIsModalVideoLoading(true)}
+                        onCanPlay={() => setIsModalVideoLoading(false)}
+                        onError={(e) => {
+                          console.error('Modal video error:', e);
+                          setModalVideoError(true);
+                          setIsModalVideoLoading(false);
+                          setIsModalVideoPlaying(false);
+                        }}
+                        onPlaying={() => {
+                          setIsModalVideoLoading(false);
+                          setModalVideoError(false);
+                        }}
+                      >
+                        <source 
+                          src={getVideoUrl(selectedItem.mp4VideoSrc)} 
+                          type="video/mp4"
+                        />
+                        {!isSafari && (
+                          <source 
+                            src={getVideoUrl(selectedItem.videoSrc)} 
+                            type="video/webm"
+                          />
+                        )}
+                        Your browser does not support HTML video.
+                      </video>
+                    )}
+                  </div>
+                )}
+
+                {/* Loading spinner */}
+                {isModalVideoLoading && (
+                  <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/50">
+                    <div className="w-12 h-12 border-4 border-[var(--primary)] border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                )}
+
+                {/* Play button overlay - only show when not playing and not loading */}
+                {!isModalVideoPlaying && !modalVideoError && !isModalVideoLoading && (
+                  <div 
+                    className="absolute inset-0 z-30 flex items-center justify-center bg-black/30 hover:bg-black/40 transition-colors cursor-pointer"
+                    onClick={() => {
+                      console.log('Play button clicked');
+                      setIsModalVideoPlaying(true);
                     }}
                   >
-                    {/* Use explicit source elements instead of src attribute */}
-                    <source 
-                      src={getVideoUrl(selectedItem.mp4VideoSrc)} 
-                      type="video/mp4"
-                    />
-                    {!isSafari && (
-                      <source 
-                        src={getVideoUrl(selectedItem.videoSrc)} 
-                        type="video/webm"
-                      />
-                    )}
-                    Your browser does not support HTML video.
-                  </video>
-                </div>
-              )}
+                    <div className="bg-[var(--primary)] rounded-full p-6 animate-pulse">
+                      <FiPlay className="w-12 h-12 text-white" />
+                    </div>
+                  </div>
+                )}
 
-              {/* Loading spinner */}
-              {isModalVideoLoading && (
-                <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/50">
-                  <div className="w-12 h-12 border-4 border-[var(--primary)] border-t-transparent rounded-full animate-spin"></div>
-                </div>
-              )}
-
-              {/* Play button overlay - only show when not playing and not loading */}
-              {!isModalVideoPlaying && !modalVideoError && !isModalVideoLoading && (
-                <div 
-                  className="absolute inset-0 z-30 flex items-center justify-center bg-black/30 hover:bg-black/40 transition-colors cursor-pointer"
-                  onClick={() => {
-                    console.log('Play button clicked');
-                    setIsModalVideoPlaying(true);
-                  }}
-                >
-                  <div className="bg-[var(--primary)] rounded-full p-6 animate-pulse">
-                    <FiPlay className="w-12 h-12 text-white" />
+                {/* Error message */}
+                {modalVideoError && (
+                  <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/80">
+                    <div className="text-center p-6">
+                      <p className="text-white text-lg mb-4">Video playback error</p>
+                      <button
+                        onClick={() => {
+                          console.log('Retry attempt:', retryCount + 1);
+                          setRetryCount(prev => prev + 1);
+                          setModalVideoError(false);
+                          setIsModalVideoPlaying(true);
+                        }}
+                        className="bg-[var(--primary)] text-white px-6 py-3 rounded-md hover:bg-opacity-80 transition-colors"
+                      >
+                        Try Again
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </ClientOnly>
+              
+              {/* Project Details */}
+              <div className="p-10">
+                <div className="flex flex-wrap justify-between items-start gap-4 mb-8">
+                  <div>
+                    <span className="text-[var(--primary)] text-lg uppercase tracking-wider">{selectedItem.category}</span>
+                    <h3 className="text-4xl font-bold text-white mt-2">{selectedItem.title}</h3>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-gray-400 text-lg">{selectedItem.year}</span>
                   </div>
                 </div>
-              )}
-
-              {/* Error message */}
-              {modalVideoError && (
-                <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/80">
-                  <div className="text-center p-6">
-                    <p className="text-white text-lg mb-4">Video playback error</p>
-                    <button
-                      onClick={() => {
-                        console.log('Retry attempt:', retryCount + 1);
-                        setRetryCount(prev => prev + 1);
-                        setModalVideoError(false);
-                        setIsModalVideoPlaying(true);
-                      }}
-                      className="bg-[var(--primary)] text-white px-6 py-3 rounded-md hover:bg-opacity-80 transition-colors"
-                    >
-                      Try Again
-                    </button>
+                
+                <p className="text-gray-300 text-xl mb-10">{selectedItem.description}</p>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div>
+                    <h4 className="text-[var(--primary)] font-bold text-xl mb-3">ROLE</h4>
+                    <p className="text-gray-300 text-lg">{selectedItem.role}</p>
                   </div>
-                </div>
-              )}
-            </div>
-            
-            {/* Project Details */}
-            <div className="p-10">
-              <div className="flex flex-wrap justify-between items-start gap-4 mb-8">
-                <div>
-                  <span className="text-[var(--primary)] text-lg uppercase tracking-wider">{selectedItem.category}</span>
-                  <h3 className="text-4xl font-bold text-white mt-2">{selectedItem.title}</h3>
-                </div>
-                <div className="text-right">
-                  <span className="text-gray-400 text-lg">{selectedItem.year}</span>
-                </div>
-              </div>
-              
-              <p className="text-gray-300 text-xl mb-10">{selectedItem.description}</p>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div>
-                  <h4 className="text-[var(--primary)] font-bold text-xl mb-3">ROLE</h4>
-                  <p className="text-gray-300 text-lg">{selectedItem.role}</p>
-                </div>
-                <div>
-                  <h4 className="text-[var(--primary)] font-bold text-xl mb-3">CLIENT</h4>
-                  <p className="text-gray-300 text-lg">{selectedItem.client}</p>
+                  <div>
+                    <h4 className="text-[var(--primary)] font-bold text-xl mb-3">CLIENT</h4>
+                    <p className="text-gray-300 text-lg">{selectedItem.client}</p>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        )}
-      </Modal>
+          )}
+        </Modal>
+      )}
     </section>
   );
 };
 
+// Export as client-only component to avoid hydration issues
 export default PortfolioSection; 

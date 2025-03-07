@@ -7,6 +7,21 @@ interface VideoBackgroundProps {
   fallbackImageUrl: string;
 }
 
+// Create a client-only wrapper to handle hydration issues
+function ClientOnly({ children, ...delegated }: { children: React.ReactNode } & any) {
+  const [hasMounted, setHasMounted] = useState(false);
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
+  if (!hasMounted) {
+    return null;
+  }
+
+  return <div {...delegated}>{children}</div>;
+}
+
 export default function VideoBackground({ fallbackImageUrl }: VideoBackgroundProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -14,6 +29,12 @@ export default function VideoBackground({ fallbackImageUrl }: VideoBackgroundPro
   const [videoLoading, setVideoLoading] = useState(true);
   const [isSafari, setIsSafari] = useState(false);
   const [videoError, setVideoError] = useState(false);
+  const [hasMounted, setHasMounted] = useState(false);
+  
+  // Mark component as mounted
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
   
   // Browser detection
   useEffect(() => {
@@ -48,7 +69,9 @@ export default function VideoBackground({ fallbackImageUrl }: VideoBackgroundPro
     // For production environment
     if (process.env.NODE_ENV === 'production') {
       // Use relative paths on production to avoid CORS issues
-      return relativePath.startsWith('/') ? relativePath.slice(1) : relativePath;
+      // Also encode spaces for better URL compatibility
+      const path = relativePath.startsWith('/') ? relativePath.slice(1) : relativePath;
+      return path.replace(/ /g, '%20');
     }
     
     // For development
@@ -58,6 +81,8 @@ export default function VideoBackground({ fallbackImageUrl }: VideoBackgroundPro
   
   // Set up video with event listeners
   useEffect(() => {
+    if (!hasMounted) return;
+    
     const video = videoRef.current;
     if (!video) return;
     
@@ -65,38 +90,40 @@ export default function VideoBackground({ fallbackImageUrl }: VideoBackgroundPro
     setVideoError(false);
     setVideoLoading(true);
     
-    const mp4Path = getVideoUrl('/assets/videos/Mp4 Fallback/hero-video.mp4');
-    const webmPath = getVideoUrl('/assets/videos/hero/hero-video.webm');
-    
-    console.log(`Hero video paths - MP4: ${mp4Path}, WebM: ${webmPath}, Using Safari: ${isSafari}`);
-    
-    // Clear existing sources
-    while (video.firstChild) {
-      video.removeChild(video.firstChild);
-    }
-    
-    // Add MP4 source (always first for maximum compatibility)
-    const mp4Source = document.createElement('source');
-    mp4Source.src = mp4Path;
-    mp4Source.type = 'video/mp4';
-    video.appendChild(mp4Source);
-    
-    // Add WebM source if not Safari
-    if (!isSafari) {
-      const webmSource = document.createElement('source');
-      webmSource.src = webmPath;
-      webmSource.type = 'video/webm';
-      video.appendChild(webmSource);
+    // In production, use a simpler approach
+    if (process.env.NODE_ENV === 'production') {
+      // Set video source directly
+      video.src = isSafari 
+        ? getVideoUrl('/assets/videos/Mp4 Fallback/hero-video.mp4')
+        : getVideoUrl('/assets/videos/hero/hero-video.webm');
+    } else {
+      // In development, use source elements
+      // Clear existing sources
+      while (video.firstChild) {
+        video.removeChild(video.firstChild);
+      }
+      
+      // Add MP4 source (always first for maximum compatibility)
+      const mp4Source = document.createElement('source');
+      mp4Source.src = getVideoUrl('/assets/videos/Mp4 Fallback/hero-video.mp4');
+      mp4Source.type = 'video/mp4';
+      video.appendChild(mp4Source);
+      
+      // Add WebM source if not Safari
+      if (!isSafari) {
+        const webmSource = document.createElement('source');
+        webmSource.src = getVideoUrl('/assets/videos/hero/hero-video.webm');
+        webmSource.type = 'video/webm';
+        video.appendChild(webmSource);
+      }
     }
     
     const handleCanPlay = () => {
-      console.log('Hero video can play');
       setVideoLoading(false);
       
-      // Try to autoplay
+      // Try to autoplay on desktop only
       if (!isMobile) {
         video.play().then(() => {
-          console.log('Hero video autoplay successful');
           setIsPlaying(true);
         }).catch(err => {
           console.error('Hero video autoplay failed:', err);
@@ -105,12 +132,10 @@ export default function VideoBackground({ fallbackImageUrl }: VideoBackgroundPro
     };
     
     const handlePlay = () => {
-      console.log('Hero video playing');
       setIsPlaying(true);
     };
     
     const handlePause = () => {
-      console.log('Hero video paused');
       setIsPlaying(false);
     };
     
@@ -135,20 +160,17 @@ export default function VideoBackground({ fallbackImageUrl }: VideoBackgroundPro
       video.removeEventListener('pause', handlePause);
       video.removeEventListener('error', handleError);
     };
-  }, [isSafari, isMobile]);
+  }, [isSafari, isMobile, hasMounted]);
   
   // Play button handler
   const handlePlayClick = () => {
     const video = videoRef.current;
     if (!video) return;
     
-    console.log('Hero play button clicked');
-    
     // Reset error state on manual play attempt
     setVideoError(false);
     
     video.play().then(() => {
-      console.log('Hero video play on click successful');
       setIsPlaying(true);
     }).catch(err => {
       console.error('Hero video play failed on click:', err);
@@ -156,8 +178,20 @@ export default function VideoBackground({ fallbackImageUrl }: VideoBackgroundPro
     });
   };
   
+  // Use fallback image if not mounted yet (avoid hydration mismatch)
+  if (!hasMounted) {
+    return (
+      <div className="absolute inset-0 z-0 bg-black">
+        <div 
+          className="absolute inset-0 bg-cover bg-center"
+          style={{ backgroundImage: `url('${fallbackImageUrl}')` }}
+        />
+      </div>
+    );
+  }
+  
   return (
-    <div className="absolute inset-0 z-0 bg-black">
+    <div className="absolute inset-0 z-0 bg-black" suppressHydrationWarning>
       {/* Fallback image */}
       <div 
         className={`absolute inset-0 bg-cover bg-center transition-opacity duration-500 ${isPlaying ? 'opacity-0' : 'opacity-100'}`}
