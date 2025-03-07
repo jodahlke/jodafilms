@@ -10,38 +10,18 @@ const nextConfig = {
   // Performance optimizations
   swcMinify: true,
   reactStrictMode: false, // Turn off strict mode for performance
+  // Turn on output static exports for Netlify
+  output: 'export',
+  distDir: 'out',
   // Media file handling
   assetPrefix: '',
-  // Optimize specific packages that are causing slowdown
+  // Experimental features (simplified)
   experimental: {
     optimizePackageImports: ['framer-motion', 'react-icons'],
-    optimizeCss: true, // Enable CSS optimization
   },
-  // Only include necessary polyfills
+  // Compiler optimizations
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production' ? { exclude: ['error', 'warn'] } : false,
-  },
-  // Configure webpack to handle media files
-  webpack: (config) => {
-    // Add more source maps in development
-    if (process.env.NODE_ENV === 'development') {
-      config.devtool = 'eval-source-map';
-    }
-    
-    // Support for video files
-    config.module.rules.push({
-      test: /\.(mp4|webm|ogg)$/,
-      use: {
-        loader: 'file-loader',
-        options: {
-          publicPath: '/_next/static/media/',
-          outputPath: 'static/media/',
-          name: '[name].[hash].[ext]',
-        },
-      },
-    });
-
-    return config;
   },
 };
 

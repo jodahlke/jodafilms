@@ -11,7 +11,7 @@ if (typeof window !== "undefined") {
   Modal.setAppElement("body");
 }
 
-// Portfolio data with actual videos and thumbnails
+// Portfolio data with thumbnails only - videos will be loaded only on the client side
 const portfolioItems = [
   {
     id: 1,
@@ -108,9 +108,11 @@ const PortfolioSection = () => {
   const [selectedItem, setSelectedItem] = useState<typeof portfolioItems[0] | null>(null);
   const [filter, setFilter] = useState("All");
   const [interactedItems, setInteractedItems] = useState<{[key: number]: boolean}>({});
+  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    // Removed redundant Modal.setAppElement call
+    // Mark that we're on the client side
+    setIsClient(true);
   }, []);
 
   const openModal = (item: typeof portfolioItems[0]) => {
@@ -174,6 +176,9 @@ const PortfolioSection = () => {
             const hasInteracted = interactedItems[item.id] || false;
 
             const handleMouseEnter = useCallback(() => {
+              // Only run video loading logic on the client
+              if (!isClient) return;
+              
               if (videoRef.current) {
                 // Only start playing videos when they're visible and after a short delay
                 const playVideo = () => {
@@ -186,7 +191,7 @@ const PortfolioSection = () => {
                 // Add a small delay to prevent too many videos loading at once
                 setTimeout(playVideo, 100 * (index % 4));
               }
-            }, [item.id, index]);
+            }, [item.id, index, isClient]);
 
             const handleMouseLeave = useCallback(() => {
               if (videoRef.current) {
@@ -206,8 +211,8 @@ const PortfolioSection = () => {
                 onMouseEnter={handleMouseEnter}
                 onMouseLeave={handleMouseLeave}
               >
-                {/* Thumbnail - Only visible before first interaction */}
-                <div className={`absolute inset-0 z-10 transition-opacity duration-300 ${hasInteracted ? 'opacity-0' : 'opacity-100'}`}>
+                {/* Thumbnail - Always show during SSR/build and before interaction */}
+                <div className={`absolute inset-0 z-10 transition-opacity duration-300 ${hasInteracted && isClient ? 'opacity-0' : 'opacity-100'}`}>
                   <Image
                     src={item.thumbnail}
                     alt={item.title}
@@ -220,20 +225,22 @@ const PortfolioSection = () => {
                   />
                 </div>
 
-                {/* Preview Video */}
-                <div className={`absolute inset-0 z-20 transition-opacity duration-300 ${hasInteracted ? 'opacity-100' : 'opacity-0'}`}>
-                  <video
-                    ref={videoRef}
-                    className="w-full h-full object-cover"
-                    muted
-                    playsInline
-                    preload="none"
-                  >
-                    {hasInteracted && (
-                      <source src={item.videoSrc} type="video/webm" />
-                    )}
-                  </video>
-                </div>
+                {/* Preview Video - Only render on client side */}
+                {isClient && (
+                  <div className={`absolute inset-0 z-20 transition-opacity duration-300 ${hasInteracted ? 'opacity-100' : 'opacity-0'}`}>
+                    <video
+                      ref={videoRef}
+                      className="w-full h-full object-cover"
+                      muted
+                      playsInline
+                      preload="none"
+                    >
+                      {hasInteracted && (
+                        <source src={item.videoSrc} type="video/webm" />
+                      )}
+                    </video>
+                  </div>
+                )}
                 
                 {/* Overlay */}
                 <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-10 z-30">
