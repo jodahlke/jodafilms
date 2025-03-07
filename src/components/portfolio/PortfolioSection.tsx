@@ -210,20 +210,21 @@ const PortfolioSection = () => {
     }));
   }, []);
 
-  // Function to get absolute URL
+  // Function to get absolute URL with proper handling for production
   const getVideoUrl = useCallback((relativePath: string) => {
     // If it's an absolute URL (starts with http or https), return as is
     if (relativePath.startsWith('http')) {
       return relativePath;
     }
     
-    // For deployed environment, use relative paths
+    // For production environment (deployed site)
     if (process.env.NODE_ENV === 'production') {
-      // Remove leading slash if present to make path relative
+      // Use relative paths on production to avoid CORS issues
+      // Remove leading slash if present
       return relativePath.startsWith('/') ? relativePath.slice(1) : relativePath;
     }
     
-    // For development, use full URL
+    // For development environment
     return isClient ? `${baseUrl}${relativePath}` : relativePath;
   }, [baseUrl, isClient]);
 
@@ -239,9 +240,12 @@ const PortfolioSection = () => {
 
   // Create a dedicated video URL for the modal
   const getModalVideoUrl = useCallback((item: PortfolioItem) => {
-    // Always use MP4 for maximum compatibility
-    return getVideoUrl(item.mp4VideoSrc);
-  }, [getVideoUrl]);
+    // Always use MP4 for Safari in production for maximum compatibility
+    const videoPath = isSafari ? item.mp4VideoSrc : item.videoSrc;
+    const url = getVideoUrl(videoPath);
+    console.log(`Modal video URL: ${url} (Safari: ${isSafari}, Env: ${process.env.NODE_ENV})`);
+    return url;
+  }, [getVideoUrl, isSafari]);
 
   // Handler for mouse enter on portfolio items
   const handleMouseEnter = useCallback((item: PortfolioItem, index: number) => {
@@ -318,6 +322,7 @@ const PortfolioSection = () => {
   // Add loading state
   const [isModalVideoLoading, setIsModalVideoLoading] = useState(false);
   const [modalVideoError, setModalVideoError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
   // Reset states when modal opens/closes
   useEffect(() => {
@@ -325,20 +330,22 @@ const PortfolioSection = () => {
       setIsModalVideoPlaying(false);
       setModalVideoError(false);
       setIsModalVideoLoading(false);
+      setRetryCount(0);
     }
   }, [modalIsOpen, selectedItem]);
 
-  // Add debug logging for video sources
+  // Debug: Log video sources when modal opens
   useEffect(() => {
-    if (selectedItem) {
-      console.log('Video sources:', {
+    if (modalIsOpen && selectedItem && isClient) {
+      console.log('Video sources available:', {
         mp4: getVideoUrl(selectedItem.mp4VideoSrc),
         webm: getVideoUrl(selectedItem.videoSrc),
-        environment: process.env.NODE_ENV,
-        baseUrl
+        isSafari,
+        isMobile,
+        environment: process.env.NODE_ENV
       });
     }
-  }, [selectedItem, getVideoUrl, baseUrl]);
+  }, [modalIsOpen, selectedItem, getVideoUrl, isSafari, isMobile, isClient]);
 
   // Memoize categories array
   const categories = Array.from(new Set(['All', ...portfolioItems.map(item => item.category)])) as Category[];
@@ -485,20 +492,27 @@ const PortfolioSection = () => {
               {isModalVideoPlaying && (
                 <div className="absolute inset-0 z-20 bg-black">
                   <video
-                    key={selectedItem.id}
-                    src={getModalVideoUrl(selectedItem)}
+                    key={`${selectedItem.id}-${retryCount}`}
                     className="w-full h-full object-cover"
                     controls
                     autoPlay
                     playsInline
                     preload="auto"
+                    poster={selectedItem.thumbnail}
                     onLoadStart={() => {
                       setIsModalVideoLoading(true);
                       console.log('Video load started');
                     }}
+                    onLoadedMetadata={() => {
+                      console.log('Video metadata loaded');
+                    }}
                     onLoadedData={() => {
                       setIsModalVideoLoading(false);
-                      console.log('Video data loaded');
+                      console.log('Video data loaded successfully');
+                    }}
+                    onCanPlay={() => {
+                      console.log('Video can play');
+                      setIsModalVideoLoading(false);
                     }}
                     onError={(e) => {
                       const video = e.currentTarget;
@@ -518,7 +532,20 @@ const PortfolioSection = () => {
                       setIsModalVideoLoading(false);
                       setModalVideoError(false);
                     }}
-                  />
+                  >
+                    {/* Use explicit source elements instead of src attribute */}
+                    <source 
+                      src={getVideoUrl(selectedItem.mp4VideoSrc)} 
+                      type="video/mp4"
+                    />
+                    {!isSafari && (
+                      <source 
+                        src={getVideoUrl(selectedItem.videoSrc)} 
+                        type="video/webm"
+                      />
+                    )}
+                    Your browser does not support HTML video.
+                  </video>
                 </div>
               )}
 
@@ -551,6 +578,8 @@ const PortfolioSection = () => {
                     <p className="text-white text-lg mb-4">Video playback error</p>
                     <button
                       onClick={() => {
+                        console.log('Retry attempt:', retryCount + 1);
+                        setRetryCount(prev => prev + 1);
                         setModalVideoError(false);
                         setIsModalVideoPlaying(true);
                       }}
