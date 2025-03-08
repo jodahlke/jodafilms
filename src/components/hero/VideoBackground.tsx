@@ -55,21 +55,21 @@ export default function VideoBackground({ fallbackImageUrl }: VideoBackgroundPro
   
   // Function to get proper video URL based on environment
   const getVideoUrl = (relativePath: string) => {
+    // If it's an absolute URL, return as is
     if (relativePath.startsWith('http')) {
       return relativePath;
     }
     
-    // For production environment
-    if (process.env.NODE_ENV === 'production') {
-      // Use relative paths on production to avoid CORS issues
-      // Also encode spaces for better URL compatibility
-      const path = relativePath.startsWith('/') ? relativePath.slice(1) : relativePath;
-      return path.replace(/ /g, '%20');
+    // For production environment - use direct Cloudinary URL since this approach is working
+    if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
+      // Return the specific hero video URL that we know works
+      if (relativePath.includes('hero-video')) {
+        return "https://res.cloudinary.com/dk5tdyhcd/video/upload/v1741424087/hero-video_lv7684.mp4";
+      }
     }
     
-    // For development
-    const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-    return `${baseUrl}${relativePath}`;
+    // Fallback to original path
+    return relativePath;
   };
   
   // Set up video with event listeners
