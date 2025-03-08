@@ -213,48 +213,23 @@ const PortfolioSection = () => {
     }));
   }, []);
 
-  // Function to get absolute URL - modified for mobile reliability
+  // Function to get video URL
   const getVideoUrl = useCallback((relativePath: string) => {
-    // Find if this is a portfolio item with a cloudinary path
-    const portfolioItem = portfolioItems.find(item => item.videoSrc === relativePath);
-    if (portfolioItem) {
-      // Use Cloudinary URL based on the filename
-      const filename = relativePath.split("/").pop()?.replace(".mp4", "").replace(/ /g, "_");
-      if (filename) {
-        console.log("Using Cloudinary for", filename);
-        return `https://res.cloudinary.com/dk5tdyhcd/video/upload/jdfilms/${filename}.mp4`;
-      }
-    }
-
-    // Hero video special case
-    if (relativePath.includes("hero-video.mp4")) {
-      return "https://res.cloudinary.com/dk5tdyhcd/video/upload/jdfilms/hero-video.mp4";
-    }
-    // If it's an absolute URL, return as is
+    // If it's an absolute URL (which all Cloudinary URLs are), return as is
     if (relativePath.startsWith('http')) {
       return relativePath;
     }
     
-    // Special handling for mobile in production
-    if (isMobile && process.env.NODE_ENV === 'production') {
-      // Get the base URL from the window location and use absolute URL
-      const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-      // Remove leading slash if present and encode spaces
-      const path = relativePath.startsWith('/') ? relativePath.slice(1) : relativePath;
-      const encodedPath = path.replace(/ /g, '%20');
-      return `${baseUrl}/${encodedPath}`;
+    // All videos now use direct Cloudinary URLs stored in the videoSrc property
+    const portfolioItem = portfolioItems.find(item => item.videoSrc === relativePath);
+    if (portfolioItem) {
+      // Return the videoSrc directly which now contains the full Cloudinary URL
+      return portfolioItem.videoSrc;
     }
     
-    // For desktop production - keep the original behavior with relative URLs
-    if (process.env.NODE_ENV === 'production' && !isMobile) {
-      // Remove leading slash if present and encode spaces
-      const path = relativePath.startsWith('/') ? relativePath.slice(1) : relativePath;
-      return path.replace(/ /g, '%20');
-    }
-    
-    // For development environment - maintain existing behavior
-    return isClient ? `${baseUrl}${relativePath}` : relativePath;
-  }, [baseUrl, isClient, isMobile]);
+    // Fallback: return the path as is
+    return relativePath;
+  }, []);
 
   // Handler for mouse enter on portfolio items
   const handleMouseEnter = useCallback((item: PortfolioItem, index: number) => {
