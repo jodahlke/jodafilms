@@ -215,6 +215,21 @@ const PortfolioSection = () => {
 
   // Function to get absolute URL - modified for mobile reliability
   const getVideoUrl = useCallback((relativePath: string) => {
+    // Find if this is a portfolio item with a cloudinary path
+    const portfolioItem = portfolioItems.find(item => item.videoSrc === relativePath);
+    if (portfolioItem) {
+      // Use Cloudinary URL based on the filename
+      const filename = relativePath.split("/").pop()?.replace(".mp4", "").replace(/ /g, "_");
+      if (filename) {
+        console.log("Using Cloudinary for", filename);
+        return `https://res.cloudinary.com/dk5tdyhcd/video/upload/jdfilms/${filename}.mp4`;
+      }
+    }
+
+    // Hero video special case
+    if (relativePath.includes("hero-video.mp4")) {
+      return "https://res.cloudinary.com/dk5tdyhcd/video/upload/jdfilms/hero-video.mp4";
+    }
     // If it's an absolute URL, return as is
     if (relativePath.startsWith('http')) {
       return relativePath;
