@@ -1,0 +1,64 @@
+# Netlify Configuration
+
+[build]
+  command = "npm run build"
+  publish = "out"
+
+# Handle CORS and proper headers for MP4 files - general pattern
+[[headers]]
+  for = "*/assets/videos/**/*.mp4"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
+    Content-Type = "video/mp4"
+    Content-Disposition = "inline"
+    Cache-Control = "public, max-age=31536000"
+
+# Global MP4 header to catch all paths
+[[headers]]
+  for = "*.mp4"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
+    Content-Type = "video/mp4"
+    Content-Disposition = "inline"
+    Cache-Control = "public, max-age=31536000"
+
+# Portfolio videos with correct path
+[[headers]]
+  for = "*/assets/videos/Mp4 portfolio/Portfolio/*.mp4"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
+    Content-Type = "video/mp4"
+    Content-Disposition = "inline"
+    Cache-Control = "public, max-age=31536000"
+    Vary = "User-Agent"
+
+# Header for hero video
+[[headers]]
+  for = "*/assets/videos/hero/*.mp4"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
+    Content-Type = "video/mp4"
+    Content-Disposition = "inline"
+    Cache-Control = "public, max-age=31536000"
+    Vary = "User-Agent"
+
+# Mobile-specific redirect to handle video files directly
+[[redirects]]
+  from = "/assets/videos/*"
+  to = "/assets/videos/:splat"
+  status = 200
+  force = false
+  conditions = {MobileDevice = true}
+
+# Disable general redirect for better video handling
+# [[redirects]]
+#   from = "/*"
+#   to = "/index.html"
+#   status = 200
+
+[build.environment]
+  NODE_VERSION = "18"
+  NEXT_TELEMETRY_DISABLED = "1"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs" 
