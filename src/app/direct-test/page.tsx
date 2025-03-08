@@ -1,0 +1,1 @@
+import React from "react"; export default function DirectTestPage() { return ( <div style={{ padding: "20px" }}><h1>Direct Video Test</h1><div><video controls width="800" src="https://res.cloudinary.com/dk5tdyhcd/video/upload/v1741424087/hero-video_lv7684.mp4" /></div></div> ); }
