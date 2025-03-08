@@ -457,7 +457,7 @@ const PortfolioSection = () => {
             <div className="p-0 md:p-4 lg:p-8 relative" suppressHydrationWarning>
               <button
                 onClick={closeModal}
-                className="absolute top-4 right-4 z-10 bg-black/50 rounded-full p-2 text-white hover:bg-black/80 transition-colors"
+                className="video-close-btn"
                 aria-label="Close modal"
               >
                 <FiX className="w-6 h-6" />
