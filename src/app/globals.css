@@ -17,6 +17,8 @@
 @layer base {
   html {
     scroll-behavior: smooth;
+    overflow-x: hidden;
+    width: 100%;
   }
   
   body {
@@ -24,6 +26,9 @@
     font-family: 'Inter', sans-serif;
     position: relative;
     background-color: var(--background);
+    overflow-x: hidden;
+    width: 100%;
+    max-width: 100vw;
   }
 
   /* Background wrapper for About through Portfolio sections */
@@ -67,6 +72,20 @@
     transform: translateZ(0);
     backface-visibility: hidden;
     perspective: 1000;
+  }
+
+  /* Fix for mobile viewport shifting issue */
+  #__next, main, .main-content {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  /* Fix for sections potentially causing overflow */
+  section {
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden;
   }
 }
 
