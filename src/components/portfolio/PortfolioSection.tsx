@@ -213,23 +213,33 @@ const PortfolioSection = () => {
     }));
   }, []);
 
-  // Function to get absolute URL
+  // Function to get absolute URL - modified for mobile reliability
   const getVideoUrl = useCallback((relativePath: string) => {
     // If it's an absolute URL, return as is
     if (relativePath.startsWith('http')) {
       return relativePath;
     }
     
-    // For production environment, use relative paths
-    if (process.env.NODE_ENV === 'production') {
+    // Special handling for mobile in production
+    if (isMobile && process.env.NODE_ENV === 'production') {
+      // Get the base URL from the window location and use absolute URL
+      const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+      // Remove leading slash if present and encode spaces
+      const path = relativePath.startsWith('/') ? relativePath.slice(1) : relativePath;
+      const encodedPath = path.replace(/ /g, '%20');
+      return `${baseUrl}/${encodedPath}`;
+    }
+    
+    // For desktop production - keep the original behavior with relative URLs
+    if (process.env.NODE_ENV === 'production' && !isMobile) {
       // Remove leading slash if present and encode spaces
       const path = relativePath.startsWith('/') ? relativePath.slice(1) : relativePath;
       return path.replace(/ /g, '%20');
     }
     
-    // For development environment
+    // For development environment - maintain existing behavior
     return isClient ? `${baseUrl}${relativePath}` : relativePath;
-  }, [baseUrl, isClient]);
+  }, [baseUrl, isClient, isMobile]);
 
   // Handler for mouse enter on portfolio items
   const handleMouseEnter = useCallback((item: PortfolioItem, index: number) => {
@@ -295,6 +305,37 @@ const PortfolioSection = () => {
       setRetryCount(0);
     }
   }, [modalIsOpen, selectedItem]);
+
+  // Preload video for mobile devices only
+  useEffect(() => {
+    if (isMobile && selectedItem && modalIsOpen && !isModalVideoPlaying) {
+      // Create a temporary video element to preload
+      const tempVideo = document.createElement('video');
+      tempVideo.style.display = 'none';
+      tempVideo.preload = 'auto';
+      tempVideo.muted = true;
+      tempVideo.playsInline = true;
+      
+      // Add source
+      const source = document.createElement('source');
+      source.src = getVideoUrl(selectedItem.videoSrc);
+      source.type = 'video/mp4';
+      tempVideo.appendChild(source);
+      
+      // Add to DOM temporarily
+      document.body.appendChild(tempVideo);
+      
+      // Load video
+      tempVideo.load();
+      
+      console.log('Preloading mobile video:', getVideoUrl(selectedItem.videoSrc));
+      
+      return () => {
+        // Clean up
+        document.body.removeChild(tempVideo);
+      };
+    }
+  }, [isMobile, selectedItem, modalIsOpen, isModalVideoPlaying, getVideoUrl]);
 
   // Memoize categories array
   const categories = Array.from(new Set(['All', ...portfolioItems.map(item => item.category)])) as Category[];
@@ -468,9 +509,28 @@ const PortfolioSection = () => {
                         console.log('Video can play');
                         // Start playing as soon as the video can play
                         if (modalVideoRef.current) {
-                          modalVideoRef.current.play().catch(error => {
-                            console.error('Auto-play failed:', error);
-                          });
+                          if (isMobile) {
+                            console.log('Attempting to play video on mobile');
+                            // For mobile - ensure attributes are set correctly
+                            modalVideoRef.current.muted = false; // Sound on for main video
+                            modalVideoRef.current.playsInline = true;
+                            
+                            // Try playing with user interaction context
+                            modalVideoRef.current.play().catch(error => {
+                              console.error('Mobile auto-play failed, will need user interaction:', error);
+                              
+                              // For mobile, we won't show an error - just require another tap
+                              if (modalVideoRef.current) {
+                                // Add visible controls for mobile
+                                modalVideoRef.current.controls = true;
+                              }
+                            });
+                          } else {
+                            // Desktop behavior - unchanged
+                            modalVideoRef.current.play().catch(error => {
+                              console.error('Auto-play failed:', error);
+                            });
+                          }
                         }
                       }}
                       onError={(e) => {
@@ -485,7 +545,26 @@ const PortfolioSection = () => {
                         setModalVideoError(false);
                       }}
                     >
-                      <source src={getVideoUrl(selectedItem.videoSrc)} type="video/mp4" />
+                      <source 
+                        src={getVideoUrl(selectedItem.videoSrc)} 
+                        type="video/mp4" 
+                      />
+                      {/* Add fallback text for mobile */}
+                      {isMobile && (
+                        <p style={{
+                          position: 'absolute',
+                          bottom: '50px',
+                          left: 0,
+                          right: 0,
+                          textAlign: 'center',
+                          color: 'white',
+                          background: 'rgba(0,0,0,0.7)',
+                          padding: '10px',
+                          display: 'none'
+                        }}>
+                          Tap to play video
+                        </p>
+                      )}
                     </video>
                   )}
                 </div>
@@ -501,9 +580,41 @@ const PortfolioSection = () => {
                 {!isModalVideoPlaying && !modalVideoError && !isModalVideoLoading && (
                   <div 
                     className="absolute inset-0 z-30 flex items-center justify-center bg-black/30 hover:bg-black/40 transition-colors cursor-pointer"
-                    onClick={async () => {
+                    onClick={async (e) => {
+                      e.preventDefault(); // Prevent any default behavior
+                      e.stopPropagation(); // Stop event propagation
+                      
                       console.log('Play button clicked');
                       setIsModalVideoPlaying(true);
+                      
+                      // For mobile only - add special handling
+                      if (isMobile) {
+                        // Force immediate loading for mobile
+                        setTimeout(() => {
+                          if (modalVideoRef.current) {
+                            console.log('Forcing mobile video load');
+                            modalVideoRef.current.load();
+                          }
+                        }, 50);
+                      }
+                    }}
+                    onTouchEnd={(e) => {
+                      // Only for mobile devices
+                      if (isMobile) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        console.log('Play button touched on mobile');
+                        setIsModalVideoPlaying(true);
+                        
+                        // Force loading
+                        setTimeout(() => {
+                          if (modalVideoRef.current) {
+                            console.log('Forcing mobile video load after touch');
+                            modalVideoRef.current.load();
+                          }
+                        }, 50);
+                      }
                     }}
                   >
                     <div className="bg-[var(--primary)] rounded-full p-6 animate-pulse">

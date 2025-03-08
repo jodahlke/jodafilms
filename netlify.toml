@@ -30,6 +30,7 @@
     Content-Type = "video/mp4"
     Content-Disposition = "inline"
     Cache-Control = "public, max-age=31536000"
+    Vary = "User-Agent"
 
 # Header for hero video
 [[headers]]
@@ -39,8 +40,17 @@
     Content-Type = "video/mp4"
     Content-Disposition = "inline"
     Cache-Control = "public, max-age=31536000"
+    Vary = "User-Agent"
 
-# Disable redirect for better video handling
+# Mobile-specific redirect to handle video files directly
+[[redirects]]
+  from = "/assets/videos/*"
+  to = "/assets/videos/:splat"
+  status = 200
+  force = false
+  conditions = {MobileDevice = true}
+
+# Disable general redirect for better video handling
 # [[redirects]]
 #   from = "/*"
 #   to = "/index.html"

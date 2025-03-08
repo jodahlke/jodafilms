@@ -92,12 +92,23 @@ export default function VideoBackground({ fallbackImageUrl }: VideoBackgroundPro
     const handleCanPlay = () => {
       setVideoLoading(false);
       
-      // Try to autoplay on desktop only
+      // For desktop - keep original behavior
       if (!isMobile) {
         video.play().then(() => {
           setIsPlaying(true);
         }).catch(err => {
           console.error('Hero video autoplay failed:', err);
+        });
+      } 
+      // For mobile - attempt autoplay but don't change state if it fails
+      else {
+        video.muted = true; // Ensure muted for mobile autoplay
+        video.playsInline = true; // Ensure playsInline for mobile
+        video.play().then(() => {
+          setIsPlaying(true);
+        }).catch(err => {
+          console.log('Mobile autoplay attempted but not supported:', err);
+          // Don't set error - just show play button for manual interaction
         });
       }
     };
@@ -138,15 +149,43 @@ export default function VideoBackground({ fallbackImageUrl }: VideoBackgroundPro
     const video = videoRef.current;
     if (!video) return;
     
+    console.log('Play button clicked');
+    
     // Reset error state on manual play attempt
     setVideoError(false);
     
-    video.play().then(() => {
-      setIsPlaying(true);
-    }).catch(err => {
-      console.error('Hero video play failed on click:', err);
-      setVideoError(true);
-    });
+    // For mobile devices - handle differently
+    if (isMobile) {
+      // Ensure video attributes are set correctly for mobile
+      video.muted = true;
+      video.playsInline = true;
+      
+      // For mobile, we need to make sure the source is loaded
+      if (!video.src) {
+        const videoPath = '/assets/videos/hero/hero-video.mp4';
+        video.src = getVideoUrl(videoPath);
+        video.load();
+      }
+      
+      // Slight delay to ensure everything is ready
+      setTimeout(() => {
+        video.play().then(() => {
+          setIsPlaying(true);
+        }).catch(err => {
+          console.error('Hero video play failed on mobile click:', err);
+          setVideoError(true);
+        });
+      }, 100);
+    } 
+    // For desktop - keep the original behavior
+    else {
+      video.play().then(() => {
+        setIsPlaying(true);
+      }).catch(err => {
+        console.error('Hero video play failed on click:', err);
+        setVideoError(true);
+      });
+    }
   };
   
   // Use fallback image if not mounted yet (avoid hydration mismatch)
