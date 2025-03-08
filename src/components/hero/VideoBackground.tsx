@@ -84,7 +84,7 @@ export default function VideoBackground({ fallbackImageUrl }: VideoBackgroundPro
     setVideoLoading(true);
     
     // Set the video source directly
-    const videoPath = '/assets/videos/hero/hero-video.mp4';
+    const videoPath = "/assets/videos/hero/hero-video.mp4";;
     video.src = getVideoUrl(videoPath);
     
     console.log('Hero video path:', getVideoUrl(videoPath));
@@ -162,7 +162,7 @@ export default function VideoBackground({ fallbackImageUrl }: VideoBackgroundPro
       
       // For mobile, we need to make sure the source is loaded
       if (!video.src) {
-        const videoPath = '/assets/videos/hero/hero-video.mp4';
+        const videoPath = "/assets/videos/hero/hero-video.mp4";;
         video.src = getVideoUrl(videoPath);
         video.load();
       }
