@@ -1,13 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
-import { Inter } from "next/font/google";
-
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-  display: "swap",
-});
+import CookieConsent from "@/components/ui/CookieConsent";
+import { CookieConsentProvider } from "@/context/CookieConsentContext";
 
 export default function ClientLayout({
   children,
@@ -31,10 +26,11 @@ export default function ClientLayout({
   }, []);
 
   return (
-    <html lang="en" className="scroll-smooth">
-      <body className={`${inter.variable} antialiased`} suppressHydrationWarning>
+    <CookieConsentProvider>
+      <div>
         {children}
-      </body>
-    </html>
+        <CookieConsent />
+      </div>
+    </CookieConsentProvider>
   );
 } 

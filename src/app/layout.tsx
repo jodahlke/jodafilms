@@ -1,6 +1,13 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import ClientLayout from "./layout-client";
+import { Inter } from "next/font/google";
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Jonas Dahlke | Filmmaker & Cinematographer",
@@ -16,5 +23,11 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return <ClientLayout>{children}</ClientLayout>;
+  return (
+    <html lang="en" className="scroll-smooth">
+      <body className={`${inter.variable} antialiased`} suppressHydrationWarning>
+        <ClientLayout>{children}</ClientLayout>
+      </body>
+    </html>
+  );
 }
