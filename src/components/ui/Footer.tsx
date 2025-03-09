@@ -32,6 +32,9 @@ const Footer = () => {
               <Link href="/imprint" className="text-gray-400 hover:text-[var(--primary)] transition-colors text-sm inline-block">
                 Impressum
               </Link>
+              <Link href="/cookie-settings" className="text-gray-400 hover:text-[var(--primary)] transition-colors text-sm inline-block">
+                Cookie Settings
+              </Link>
             </div>
           </div>
           

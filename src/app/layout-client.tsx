@@ -3,6 +3,8 @@
 import { useEffect } from "react";
 import { Inter } from "next/font/google";
 import Head from 'next/head';
+import CookieConsent from "@/components/ui/CookieConsent";
+import { CookieConsentProvider } from "@/context/CookieConsentContext";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -44,7 +46,10 @@ export default function ClientLayout({
   return (
     <html lang="en" className="scroll-smooth">
       <body className={`${inter.variable} antialiased w-full overflow-x-hidden`} suppressHydrationWarning>
-        {children}
+        <CookieConsentProvider>
+          {children}
+          <CookieConsent />
+        </CookieConsentProvider>
       </body>
     </html>
   );
