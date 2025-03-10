@@ -7,18 +7,33 @@ import { FiMenu, FiX } from "react-icons/fi";
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [scrollProgress, setScrollProgress] = useState(0);
 
   useEffect(() => {
     // Set initial scroll state
     if (typeof window !== 'undefined') {
       setScrolled(window.scrollY > 50);
+      
+      // Calculate initial scroll progress
+      const windowHeight = document.documentElement.scrollHeight - window.innerHeight;
+      if (windowHeight > 0) {
+        setScrollProgress((window.scrollY / windowHeight) * 100);
+      }
     }
 
     const handleScroll = () => {
+      // Update scrolled state
       if (window.scrollY > 50) {
         setScrolled(true);
       } else {
         setScrolled(false);
+      }
+      
+      // Calculate scroll progress percentage (0-100)
+      const windowHeight = document.documentElement.scrollHeight - window.innerHeight;
+      if (windowHeight > 0) {
+        const scrolled = (window.scrollY / windowHeight) * 100;
+        setScrollProgress(scrolled);
       }
     };
 
@@ -63,6 +78,19 @@ const Navbar = () => {
         >
           {isOpen ? <FiX /> : <FiMenu />}
         </button>
+      </div>
+
+      {/* Scroll Progress Line */}
+      <div className="absolute bottom-0 left-0 w-full h-[2px] bg-transparent overflow-hidden">
+        <div 
+          className="h-full bg-white"
+          style={{ 
+            width: '100%', 
+            transform: `translateX(${scrollProgress - 100}%)`,
+            transition: 'transform 0.1s ease-out'
+          }}
+          aria-hidden="true"
+        />
       </div>
 
       {/* Mobile Navigation */}

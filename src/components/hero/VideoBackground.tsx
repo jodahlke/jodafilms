@@ -60,8 +60,8 @@ export default function VideoBackground({ fallbackImageUrl }: VideoBackgroundPro
       return relativePath;
     }
     
-    // For production environment - use direct Cloudinary URL since this approach is working
-    if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
+    // For all environments - use direct Cloudinary URL for hero video
+    if (true) {
       // Return the specific hero video URL that we know works
       if (relativePath.includes('hero-video')) {
         return "https://res.cloudinary.com/dk5tdyhcd/video/upload/v1741424087/hero-video_lv7684.mp4";
@@ -84,7 +84,7 @@ export default function VideoBackground({ fallbackImageUrl }: VideoBackgroundPro
     setVideoLoading(true);
     
     // Set the video source directly
-    const videoPath = "/assets/videos/hero/hero-video.mp4";;
+    const videoPath = "/assets/videos/hero/hero-video.mp4";
     video.src = getVideoUrl(videoPath);
     
     console.log('Hero video path:', getVideoUrl(videoPath));
@@ -162,7 +162,7 @@ export default function VideoBackground({ fallbackImageUrl }: VideoBackgroundPro
       
       // For mobile, we need to make sure the source is loaded
       if (!video.src) {
-        const videoPath = "/assets/videos/hero/hero-video.mp4";;
+        const videoPath = "/assets/videos/hero/hero-video.mp4";
         video.src = getVideoUrl(videoPath);
         video.load();
       }
