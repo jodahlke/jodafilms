@@ -12,6 +12,13 @@ if (typeof window !== "undefined") {
   Modal.setAppElement("body");
 }
 
+// Add Vimeo Player type
+declare global {
+  interface Window {
+    Vimeo?: any;
+  }
+}
+
 // Create a client-only wrapper to handle hydration issues
 function ClientOnly({ children, ...delegated }: { children: React.ReactNode } & any) {
   const [hasMounted, setHasMounted] = useState(false);
@@ -27,14 +34,245 @@ function ClientOnly({ children, ...delegated }: { children: React.ReactNode } & 
   return <div {...delegated}>{children}</div>;
 }
 
-// Updated portfolio data with correct MP4 paths
+// Directly using Vimeo's embed without their SDK for more reliable playback
+function HoverVideoThumbnail({
+  vimeoUrl,
+  thumbnailUrl,
+  title,
+  category,
+  description,
+  onClick,
+  onHoverStart,
+  onHoverEnd
+}: {
+  vimeoUrl: string;
+  thumbnailUrl: string;
+  title: string;
+  category: string;
+  description: string;
+  onClick: () => void;
+  onHoverStart?: () => void;
+  onHoverEnd?: () => void;
+}) {
+  // Extract Vimeo ID
+  const vimeoId = vimeoUrl.split('/').pop();
+  
+  // State
+  const [isHovered, setIsHovered] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [hasFirstInteraction, setHasFirstInteraction] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  
+  // Check for mobile devices
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const checkMobile = () => {
+        const ua = navigator.userAgent;
+        const mobileCheck = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+        return mobileCheck || window.innerWidth < 768;
+      };
+      
+      setIsMobile(checkMobile());
+      
+      const handleResize = () => {
+        setIsMobile(checkMobile());
+      };
+      
+      window.addEventListener('resize', handleResize);
+      return () => window.removeEventListener('resize', handleResize);
+    }
+  }, []);
+  
+  // Setup intersection observer to preload videos when near viewport
+  useEffect(() => {
+    if (!containerRef.current || typeof window === 'undefined') return;
+    
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            // Mark as visible - this ensures iframe is rendered
+            setIsLoaded(true);
+            observerRef.current?.disconnect();
+          }
+        });
+      },
+      { rootMargin: '200px' } // Start loading when within 200px of viewport
+    );
+    
+    observerRef.current.observe(containerRef.current);
+    
+    return () => {
+      observerRef.current?.disconnect();
+    };
+  }, []);
+  
+  // Event handlers
+  const handleMouseEnter = useCallback(() => {
+    if (isMobile) return;
+    
+    setIsHovered(true);
+    setHasFirstInteraction(true);
+    
+    if (onHoverStart) onHoverStart();
+    
+    // Handle playback using postMessage API
+    if (iframeRef.current && iframeRef.current.contentWindow) {
+      try {
+        // Send multiple command methods to ensure it plays
+        iframeRef.current.contentWindow.postMessage(
+          JSON.stringify({ method: 'play' }),
+          '*'
+        );
+        
+        // Also trigger play directly on the iframe element
+        if (iframeRef.current.src.includes('autoplay=0')) {
+          // Update src to force autoplay if needed
+          const newSrc = iframeRef.current.src.replace('autoplay=0', 'autoplay=1');
+          iframeRef.current.src = newSrc;
+        }
+      } catch (error) {
+        console.error('Failed to play via postMessage:', error);
+      }
+    }
+  }, [isMobile, onHoverStart]);
+  
+  const handleMouseLeave = useCallback(() => {
+    if (isMobile) return;
+    
+    setIsHovered(false);
+    
+    if (onHoverEnd) onHoverEnd();
+    
+    // Pause using postMessage API
+    if (iframeRef.current && iframeRef.current.contentWindow) {
+      try {
+        iframeRef.current.contentWindow.postMessage(
+          JSON.stringify({ method: 'pause' }),
+          '*'
+        );
+      } catch (error) {
+        console.error('Failed to pause via postMessage:', error);
+      }
+    }
+  }, [isMobile, onHoverEnd]);
+  
+  // Listen for messages from the iframe to track load state
+  useEffect(() => {
+    if (typeof window === 'undefined' || isMobile) return;
+    
+    const handleMessage = (event: MessageEvent) => {
+      if (!vimeoId) return;
+      
+      try {
+        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+        
+        if (data && data.event === 'ready') {
+          setIsLoaded(true);
+          
+          // Pre-buffer video content
+          if (iframeRef.current && iframeRef.current.contentWindow) {
+            // Get first frame loaded
+            iframeRef.current.contentWindow.postMessage(
+              JSON.stringify({ method: 'play' }),
+              '*'
+            );
+            
+            // Immediately pause to show first frame
+            setTimeout(() => {
+              if (!isHovered && iframeRef.current && iframeRef.current.contentWindow) {
+                iframeRef.current.contentWindow.postMessage(
+                  JSON.stringify({ method: 'pause' }),
+                  '*'
+                );
+              }
+            }, 100);
+          }
+        }
+      } catch (error) {
+        // Ignore parsing errors from other messages
+      }
+    };
+    
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [vimeoId, isMobile, isHovered]);
+  
+  // Build the iframe source URL with optimal parameters
+  const getVimeoEmbedUrl = useCallback(() => {
+    return `https://player.vimeo.com/video/${vimeoId}?background=1&autopause=0&transparent=0&autoplay=1&loop=1&muted=1&controls=0&quality=720p&dnt=1`;
+  }, [vimeoId]);
+  
+  return (
+    <div 
+      ref={containerRef}
+      className="group relative overflow-hidden aspect-video cursor-pointer hover:shadow-2xl transition-all duration-300 hover:scale-[1.02] bg-black"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      onClick={onClick}
+    >
+      {/* Thumbnail (only shown if never interacted with) */}
+      <div 
+        className={`absolute inset-0 z-10 transition-opacity duration-300 ${
+          hasFirstInteraction && !isMobile ? 'opacity-0' : 'opacity-100'
+        }`}
+      >
+        <Image
+          src={thumbnailUrl}
+          alt={title}
+          fill
+          className="object-cover"
+          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+          priority
+        />
+      </div>
+      
+      {/* Vimeo Background Player (shown once interaction happens or preloaded) */}
+      {(isLoaded || hasFirstInteraction) && (
+        <div 
+          className={`absolute inset-0 z-20 transition-opacity duration-300 ${
+            hasFirstInteraction && !isMobile ? 'opacity-100' : 'opacity-0'
+          }`}
+        >
+          <iframe
+            ref={iframeRef}
+            src={getVimeoEmbedUrl()}
+            className="absolute inset-0 w-full h-full"
+            frameBorder="0" 
+            allow="autoplay; fullscreen"
+            loading="eager"
+            title={`${title} preview`}
+          ></iframe>
+        </div>
+      )}
+      
+      {/* Content Overlay (always on top) */}
+      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-10 z-30">
+        <div>
+          <span className="text-[var(--primary)] text-base uppercase tracking-wider">{category}</span>
+          <h3 className="text-3xl font-bold text-white mt-3">{title}</h3>
+          <p className="text-gray-300 mt-3 text-lg line-clamp-2">{description}</p>
+          <div className="mt-6 flex items-center">
+            <span className="text-white text-base mr-2">View Project</span>
+            <FiExternalLink className="text-[var(--primary)] w-5 h-5" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Updated portfolio data with Vimeo links
 const portfolioItems = [
   {
     id: 1,
     title: "Kasa Kundavi",
     category: "Commercial",
     thumbnail: "/assets/videos/thumbnails/kasakundavi.jpg",
-    videoSrc: "https://res.cloudinary.com/dk5tdyhcd/video/upload/v1741424066/Kasa_Kundavi_doniyt.mp4",
+    videoSrc: "https://vimeo.com/1070418839",
     description: "A captivating commercial that showcases the essence of Kasa Kundavi, blending traditional values with modern storytelling.",
     role: "Director & Cinematographer",
     year: 2023,
@@ -45,7 +283,7 @@ const portfolioItems = [
     title: "Alex Smith",
     category: "Documentary",
     thumbnail: "/assets/videos/thumbnails/hawaii-alex-smith.jpg",
-    videoSrc: "https://res.cloudinary.com/dk5tdyhcd/video/upload/v1741424083/alex_smith_bepfki.mp4",
+    videoSrc: "https://vimeo.com/1070418701",
     description: "An intimate documentary portrait capturing the journey and passion of Alex Smith.",
     role: "Director of Photography",
     year: 2023,
@@ -56,7 +294,7 @@ const portfolioItems = [
     title: "Blowup Media",
     category: "Corporate",
     thumbnail: "/assets/videos/thumbnails/blowupmedia.jpg",
-    videoSrc: "https://res.cloudinary.com/dk5tdyhcd/video/upload/v1741424065/blowupmedia_j7c3k9.mp4",
+    videoSrc: "https://vimeo.com/1070418805",
     description: "A dynamic corporate video showcasing Blowup Media's innovative approach to digital advertising.",
     role: "Director & Editor",
     year: 2023,
@@ -67,7 +305,7 @@ const portfolioItems = [
     title: "MRGE",
     category: "Commercial",
     thumbnail: "/assets/videos/thumbnails/mrge.jpg",
-    videoSrc: "https://res.cloudinary.com/dk5tdyhcd/video/upload/v1741424067/mrge_gzgcjn.mp4",
+    videoSrc: "https://vimeo.com/1070418893",
     description: "A sleek and modern commercial highlighting MRGE's cutting-edge products and services.",
     role: "Cinematographer",
     year: 2023,
@@ -78,7 +316,7 @@ const portfolioItems = [
     title: "MVMT",
     category: "Commercial",
     thumbnail: "/assets/videos/thumbnails/mvmt.jpg",
-    videoSrc: "https://res.cloudinary.com/dk5tdyhcd/video/upload/v1741424056/mvmt_mbrrm8.mp4",
+    videoSrc: "https://vimeo.com/1070442029",
     description: "A stylish commercial for MVMT watches, capturing the essence of modern lifestyle and fashion.",
     role: "Director & Cinematographer",
     year: 2023,
@@ -89,7 +327,7 @@ const portfolioItems = [
     title: "Radio 912",
     category: "Commercial",
     thumbnail: "/assets/videos/thumbnails/radio912.jpg",
-    videoSrc: "https://res.cloudinary.com/dk5tdyhcd/video/upload/v1741424050/radio912_bo8nr0.mp4",
+    videoSrc: "https://vimeo.com/1070418920",
     description: "An energetic commercial for Radio 912, bringing sound and visuals together in perfect harmony.",
     role: "Director",
     year: 2023,
@@ -100,7 +338,7 @@ const portfolioItems = [
     title: "SL",
     category: "Commercial",
     thumbnail: "/assets/videos/thumbnails/sl.jpg",
-    videoSrc: "https://res.cloudinary.com/dk5tdyhcd/video/upload/v1741424037/sl_ypkbx2.mp4",
+    videoSrc: "https://vimeo.com/1070418942",
     description: "A compelling commercial that tells the story of SL through sophisticated cinematography.",
     role: "Director of Photography",
     year: 2023,
@@ -111,7 +349,7 @@ const portfolioItems = [
     title: "Vinature",
     category: "Commercial",
     thumbnail: "/assets/videos/thumbnails/vinature.jpg",
-    videoSrc: "https://res.cloudinary.com/dk5tdyhcd/video/upload/v1741424079/vinature_t1vust.mp4",
+    videoSrc: "https://vimeo.com/1070418320",
     description: "An artistic commercial for Vinature, celebrating the beauty of natural wine and sustainable practices.",
     role: "Director & Cinematographer",
     year: 2023,
@@ -127,7 +365,6 @@ const PortfolioSection = () => {
   const [modalIsOpen, setModalIsOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<PortfolioItem | null>(null);
   const [filter, setFilter] = useState<Category>('All');
-  const [interactedItems, setInteractedItems] = useState<{[key: number]: boolean}>({});
   const [isClient, setIsClient] = useState(false);
   const [baseUrl, setBaseUrl] = useState('');
   const [isMobile, setIsMobile] = useState(false);
@@ -136,8 +373,7 @@ const PortfolioSection = () => {
   const [modalVideoError, setModalVideoError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   
-  // Create a map of video refs outside the render loop
-  const videoRefs = useRef<Map<number, HTMLVideoElement | null>>(new Map());
+  // Reference to modal video
   const modalVideoRef = useRef<HTMLVideoElement>(null);
 
   // Detect mobile devices
@@ -171,30 +407,6 @@ const PortfolioSection = () => {
     }
   }, []);
 
-  // Cleanup function for videos
-  const cleanupVideos = useCallback(() => {
-    videoRefs.current.forEach((video) => {
-      if (video) {
-        video.pause();
-        video.removeAttribute('src');
-        video.load();
-      }
-    });
-  }, []);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      cleanupVideos();
-    };
-  }, [cleanupVideos]);
-
-  // Reset video states when filter changes
-  useEffect(() => {
-    setInteractedItems({});
-    cleanupVideos();
-  }, [filter, cleanupVideos]);
-
   // Modal handlers
   const openModal = useCallback((item: PortfolioItem) => {
     setSelectedItem(item);
@@ -204,86 +416,6 @@ const PortfolioSection = () => {
   const closeModal = useCallback(() => {
     setModalIsOpen(false);
     setTimeout(() => setSelectedItem(null), 300); // Clear after animation
-  }, []);
-
-  const handleItemInteraction = useCallback((itemId: number) => {
-    setInteractedItems(prev => ({
-      ...prev,
-      [itemId]: true
-    }));
-  }, []);
-
-  // Function to get video URL
-  const getVideoUrl = useCallback((relativePath: string) => {
-    // If it's an absolute URL (which all Cloudinary URLs are), return as is
-    if (relativePath.startsWith('http')) {
-      return relativePath;
-    }
-    
-    // All videos now use direct Cloudinary URLs stored in the videoSrc property
-    const portfolioItem = portfolioItems.find(item => item.videoSrc === relativePath);
-    if (portfolioItem) {
-      // Return the videoSrc directly which now contains the full Cloudinary URL
-      return portfolioItem.videoSrc;
-    }
-    
-    // Fallback: return the path as is
-    return relativePath;
-  }, []);
-
-  // Handler for mouse enter on portfolio items
-  const handleMouseEnter = useCallback((item: PortfolioItem, index: number) => {
-    if (!isClient) return;
-    
-    const videoElement = videoRefs.current.get(item.id);
-    if (videoElement) {
-      // If this is the first interaction, set up the video sources
-      if (!interactedItems[item.id]) {
-        // Clear any existing sources
-        while (videoElement.firstChild) {
-          videoElement.removeChild(videoElement.firstChild);
-        }
-        
-        // Set video source
-        const source = document.createElement('source');
-        source.src = getVideoUrl(item.videoSrc);
-        source.type = 'video/mp4';
-        videoElement.appendChild(source);
-        
-        // Load the video
-        videoElement.load();
-        
-        // Mark as interacted
-        handleItemInteraction(item.id);
-      }
-      
-      // Play the video (will resume from where it was paused)
-      const playVideo = async () => {
-        try {
-          // Reset the video if it ended
-          if (videoElement.ended) {
-            videoElement.currentTime = 0;
-          }
-          await videoElement.play();
-        } catch (error: unknown) {
-          // Don't show error in console for user interaction required error
-          if (error instanceof Error && error.name !== 'NotAllowedError') {
-            console.error(`Video play failed for ${item.title}:`, error);
-          }
-        }
-      };
-      
-      setTimeout(playVideo, 100 * (index % 4));
-    }
-  }, [isClient, handleItemInteraction, getVideoUrl, interactedItems]);
-
-  // Handler for mouse leave on portfolio items
-  const handleMouseLeave = useCallback((itemId: number) => {
-    const videoElement = videoRefs.current.get(itemId);
-    if (videoElement) {
-      // Pause the video but don't reset it
-      videoElement.pause();
-    }
   }, []);
 
   // Reset states when modal opens/closes
@@ -296,36 +428,10 @@ const PortfolioSection = () => {
     }
   }, [modalIsOpen, selectedItem]);
 
-  // Preload video for mobile devices only
-  useEffect(() => {
-    if (isMobile && selectedItem && modalIsOpen && !isModalVideoPlaying) {
-      // Create a temporary video element to preload
-      const tempVideo = document.createElement('video');
-      tempVideo.style.display = 'none';
-      tempVideo.preload = 'auto';
-      tempVideo.muted = true;
-      tempVideo.playsInline = true;
-      
-      // Add source
-      const source = document.createElement('source');
-      source.src = getVideoUrl(selectedItem.videoSrc);
-      source.type = 'video/mp4';
-      tempVideo.appendChild(source);
-      
-      // Add to DOM temporarily
-      document.body.appendChild(tempVideo);
-      
-      // Load video
-      tempVideo.load();
-      
-      console.log('Preloading mobile video:', getVideoUrl(selectedItem.videoSrc));
-      
-      return () => {
-        // Clean up
-        document.body.removeChild(tempVideo);
-      };
-    }
-  }, [isMobile, selectedItem, modalIsOpen, isModalVideoPlaying, getVideoUrl]);
+  // Extract Vimeo ID from URL
+  const getVimeoId = (url: string) => {
+    return url.startsWith('https://vimeo.com/') ? url.split('/').pop() : null;
+  };
 
   // Memoize categories array
   const categories = Array.from(new Set(['All', ...portfolioItems.map(item => item.category)])) as Category[];
@@ -336,10 +442,8 @@ const PortfolioSection = () => {
     : portfolioItems.filter(item => item.category === filter);
 
   const handleFilterClick = useCallback((category: Category) => {
-    // Pause all videos before changing filter
-    cleanupVideos();
     setFilter(category);
-  }, [cleanupVideos]);
+  }, []);
 
   return (
     <section id="portfolio" className="section-padding">
@@ -375,74 +479,30 @@ const PortfolioSection = () => {
 
         {/* Portfolio Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 max-w-[2400px] mx-auto">
-          {filteredItems.map((item, index) => {
-            const hasInteracted = interactedItems[item.id] || false;
-
-            return (
-              <motion.div
-                key={item.id}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-100px" }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-                className="group relative overflow-hidden aspect-video cursor-pointer hover:shadow-2xl transition-all duration-300 hover:scale-[1.02]"
+          {filteredItems.map((item, index) => (
+            <motion.div
+              key={item.id}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-100px" }}
+              transition={{ duration: 0.5, delay: index * 0.1 }}
+            >
+              <HoverVideoThumbnail
+                vimeoUrl={item.videoSrc}
+                thumbnailUrl={item.thumbnail}
+                title={item.title}
+                category={item.category}
+                description={item.description}
                 onClick={() => openModal(item)}
-                onMouseEnter={() => handleMouseEnter(item, index)}
-                onMouseLeave={() => handleMouseLeave(item.id)}
-              >
-                {/* Thumbnail */}
-                <div className={`absolute inset-0 z-10 transition-opacity duration-300 ${hasInteracted && isClient ? 'opacity-0' : 'opacity-100'}`}>
-                  <Image
-                    src={item.thumbnail}
-                    alt={item.title}
-                    fill
-                    className="object-cover portfolio-thumbnail"
-                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                    priority={index < 2}
-                    loading={index < 4 ? "eager" : "lazy"}
-                    quality={80}
-                  />
-                </div>
-
-                {/* Preview Video */}
-                {isClient && (
-                  <div className={`absolute inset-0 z-20 transition-opacity duration-300 ${hasInteracted ? 'opacity-100' : 'opacity-0'}`}>
-                    <video
-                      ref={el => {
-                        if (el) videoRefs.current.set(item.id, el);
-                      }}
-                      className="w-full h-full object-cover"
-                      muted
-                      playsInline
-                      preload="metadata"
-                      loop
-                      onError={(e) => {
-                        const target = e.target as HTMLVideoElement;
-                        console.error(`Video error for ${item.title}:`, e, target.error);
-                      }}
-                    />
-                  </div>
-                )}
-                
-                {/* Overlay */}
-                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-10 z-30">
-                  <div>
-                    <span className="text-[var(--primary)] text-base uppercase tracking-wider">{item.category}</span>
-                    <h3 className="text-3xl font-bold text-white mt-3">{item.title}</h3>
-                    <p className="text-gray-300 mt-3 text-lg line-clamp-2">{item.description}</p>
-                    <div className="mt-6 flex items-center">
-                      <span className="text-white text-base mr-2">View Project</span>
-                      <FiExternalLink className="text-[var(--primary)] w-5 h-5" />
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            );
-          })}
+                onHoverStart={() => console.log(`Hovering item ${item.id}`)}
+                onHoverEnd={() => console.log(`Left item ${item.id}`)}
+              />
+            </motion.div>
+          ))}
         </div>
       </div>
 
-      {/* Use ClientOnly for Modal to prevent hydration issues */}
+      {/* Modal */}
       {isClient && (
         <Modal
           isOpen={modalIsOpen}
@@ -482,80 +542,71 @@ const PortfolioSection = () => {
                 {/* Video element - only shown when playing */}
                 <div className={`absolute inset-0 z-20 bg-black ${isModalVideoPlaying ? 'opacity-100' : 'opacity-0'}`}>
                   {isModalVideoPlaying && (
-                    <video
-                      key={`${selectedItem.id}-${retryCount}`}
-                      className="w-full h-full object-cover"
-                      controls
-                      playsInline
-                      preload="auto"
-                      poster={selectedItem.thumbnail}
-                      ref={modalVideoRef}
-                      onLoadStart={() => {
-                        setIsModalVideoLoading(true);
-                        console.log('Video load started');
-                      }}
-                      onCanPlay={() => {
-                        setIsModalVideoLoading(false);
-                        console.log('Video can play');
-                        // Start playing as soon as the video can play
-                        if (modalVideoRef.current) {
-                          if (isMobile) {
-                            console.log('Attempting to play video on mobile');
-                            // For mobile - ensure attributes are set correctly
-                            modalVideoRef.current.muted = false; // Sound on for main video
-                            modalVideoRef.current.playsInline = true;
-                            
-                            // Try playing with user interaction context
-                            modalVideoRef.current.play().catch(error => {
-                              console.error('Mobile auto-play failed, will need user interaction:', error);
-                              
-                              // For mobile, we won't show an error - just require another tap
-                              if (modalVideoRef.current) {
-                                // Add visible controls for mobile
-                                modalVideoRef.current.controls = true;
+                    <>
+                      {getVimeoId(selectedItem.videoSrc) ? (
+                        <iframe
+                          src={`https://player.vimeo.com/video/${getVimeoId(selectedItem.videoSrc)}?autoplay=1&loop=0&dnt=1`}
+                          className="w-full h-full"
+                          allow="autoplay; fullscreen; picture-in-picture"
+                          frameBorder="0"
+                          allowFullScreen
+                          onLoad={() => {
+                            setIsModalVideoLoading(false);
+                            setModalVideoError(false);
+                          }}
+                        ></iframe>
+                      ) : (
+                        <video
+                          key={`${selectedItem.id}-${retryCount}`}
+                          className="w-full h-full object-cover"
+                          controls
+                          playsInline
+                          preload="auto"
+                          poster={selectedItem.thumbnail}
+                          ref={modalVideoRef}
+                          onLoadStart={() => {
+                            setIsModalVideoLoading(true);
+                          }}
+                          onCanPlay={() => {
+                            setIsModalVideoLoading(false);
+                            if (modalVideoRef.current) {
+                              if (isMobile) {
+                                modalVideoRef.current.muted = false;
+                                modalVideoRef.current.playsInline = true;
+                                
+                                modalVideoRef.current.play().catch(error => {
+                                  console.error('Mobile auto-play failed, will need user interaction:', error);
+                                  
+                                  if (modalVideoRef.current) {
+                                    modalVideoRef.current.controls = true;
+                                  }
+                                });
+                              } else {
+                                modalVideoRef.current.play().catch(error => {
+                                  console.error('Auto-play failed:', error);
+                                });
                               }
-                            });
-                          } else {
-                            // Desktop behavior - unchanged
-                            modalVideoRef.current.play().catch(error => {
-                              console.error('Auto-play failed:', error);
-                            });
-                          }
-                        }
-                      }}
-                      onError={(e) => {
-                        const target = e.target as HTMLVideoElement;
-                        console.error('Modal video error:', e, target.error);
-                        setModalVideoError(true);
-                        setIsModalVideoLoading(false);
-                        setIsModalVideoPlaying(false);
-                      }}
-                      onPlaying={() => {
-                        setIsModalVideoLoading(false);
-                        setModalVideoError(false);
-                      }}
-                    >
-                      <source 
-                        src={getVideoUrl(selectedItem.videoSrc)} 
-                        type="video/mp4" 
-                      />
-                      {/* Add fallback text for mobile */}
-                      {isMobile && (
-                        <p style={{
-                          position: 'absolute',
-                          bottom: '50px',
-                          left: 0,
-                          right: 0,
-                          textAlign: 'center',
-                          color: 'white',
-                          background: 'rgba(0,0,0,0.7)',
-                          padding: '10px',
-                          display: 'none'
-                        }}>
-                          Tap to play video
-                        </p>
+                            }
+                          }}
+                          onError={(e) => {
+                            const target = e.target as HTMLVideoElement;
+                            console.error('Modal video error:', e, target.error);
+                            setModalVideoError(true);
+                            setIsModalVideoLoading(false);
+                            setIsModalVideoPlaying(false);
+                          }}
+                          onPlaying={() => {
+                            setIsModalVideoLoading(false);
+                            setModalVideoError(false);
+                          }}
+                        >
+                          <source 
+                            src={selectedItem.videoSrc} 
+                            type="video/mp4" 
+                          />
+                        </video>
                       )}
-                    </video>
+                    </>
                   )}
                 </div>
 
@@ -566,44 +617,19 @@ const PortfolioSection = () => {
                   </div>
                 )}
 
-                {/* Play button overlay - only show when not playing and not loading */}
+                {/* Play button overlay */}
                 {!isModalVideoPlaying && !modalVideoError && !isModalVideoLoading && (
                   <div 
                     className="absolute inset-0 z-30 flex items-center justify-center bg-black/30 hover:bg-black/40 transition-colors cursor-pointer"
-                    onClick={async (e) => {
-                      e.preventDefault(); // Prevent any default behavior
-                      e.stopPropagation(); // Stop event propagation
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
                       
-                      console.log('Play button clicked');
                       setIsModalVideoPlaying(true);
                       
-                      // For mobile only - add special handling
-                      if (isMobile) {
-                        // Force immediate loading for mobile
-                        setTimeout(() => {
-                          if (modalVideoRef.current) {
-                            console.log('Forcing mobile video load');
-                            modalVideoRef.current.load();
-                          }
-                        }, 50);
-                      }
-                    }}
-                    onTouchEnd={(e) => {
-                      // Only for mobile devices
-                      if (isMobile) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        
-                        console.log('Play button touched on mobile');
-                        setIsModalVideoPlaying(true);
-                        
-                        // Force loading
-                        setTimeout(() => {
-                          if (modalVideoRef.current) {
-                            console.log('Forcing mobile video load after touch');
-                            modalVideoRef.current.load();
-                          }
-                        }, 50);
+                      // For Vimeo videos, show loading indicator until iframe loads
+                      if (selectedItem && getVimeoId(selectedItem.videoSrc)) {
+                        setIsModalVideoLoading(true);
                       }
                     }}
                   >
@@ -620,7 +646,6 @@ const PortfolioSection = () => {
                       <p className="text-white text-lg mb-4">Video playback error</p>
                       <button
                         onClick={() => {
-                          console.log('Retry attempt:', retryCount + 1);
                           setRetryCount(prev => prev + 1);
                           setModalVideoError(false);
                           setIsModalVideoPlaying(true);
