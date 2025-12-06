@@ -16,7 +16,7 @@ export default function Impressum() {
           <h1 className="text-3xl md:text-4xl font-bold mb-8 text-[var(--primary)]">Impressum</h1>
           
           <section className="mb-8">
-            <h2 className="text-xl font-bold mb-4">Angaben gemäß § 5 TMG</h2>
+            <h2 className="text-xl font-bold mb-4">Angaben gemäß § 5 DDG</h2>
             <p className="mb-4 text-gray-300">
               Jonas Dahlke<br />
               Münsterstr. 165<br />
