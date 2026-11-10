@@ -35,7 +35,7 @@ A modern, responsive portfolio website for filmmakers and cinematographers built
 
 ### Prerequisites
 
-- Node.js 18.x or later
+- Node.js 20.9 or later
 - npm or yarn
 
 ### Installation
