@@ -33,6 +33,14 @@ export default function Impressum() {
           </section>
 
           <section className="mb-8">
+            <h2 className="text-xl font-bold mb-4">Umsatzsteuer-ID</h2>
+            <p className="mb-4 text-gray-300">
+              Umsatzsteuer-Identifikationsnummer gemäß § 27 a Umsatzsteuergesetz:<br />
+              DE348582607
+            </p>
+          </section>
+
+          <section className="mb-8">
             <h2 className="text-xl font-bold mb-4">Verantwortlich für den Inhalt nach § 18 Abs. 2 MStV</h2>
             <p className="mb-4 text-gray-300">
               Jonas Dahlke<br />
